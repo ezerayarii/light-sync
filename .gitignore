@@ -1,0 +1,17 @@
+# secrets: copy secrets.example.yaml to secrets.yaml, .env.example to .env
+secrets.yaml
+.env
+.env.*
+!.env.example
+
+# local data, logs and installed packages
+data/
+logs/
+summaries/
+vendor/
+backup_*/
+__pycache__/
+*.pyc
+*.log
+.DS_Store
+Thumbs.db

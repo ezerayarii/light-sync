@@ -1,0 +1,106 @@
+# Neon Club - Home Assistant theme for the "Smart home" dashboard (set per view, the rest of HA is unchanged).
+# Install: copy to /config/themes/ (configuration.yaml needs  frontend: themes: !include_dir_merge_named themes),
+# then Developer tools -> Actions -> frontend.reload_themes. Same colors as the Light Sync live view and show.
+Neon Club:
+  # palette
+  neon-pink: "#ff2bd6"
+  neon-violet: "#8b5cff"
+  neon-cyan: "#22e4ff"
+  neon-lime: "#b6ff3b"
+
+  # base
+  primary-color: "var(--neon-pink)"
+  accent-color: "var(--neon-cyan)"
+  rgb-primary-color: "255, 43, 214"
+  rgb-accent-color: "34, 228, 255"
+  primary-background-color: "#05040a"
+  secondary-background-color: "#0e0a1c"
+  primary-text-color: "#f5f1ff"
+  rgb-primary-text-color: "245, 241, 255"
+  secondary-text-color: "#988fb6"
+  disabled-text-color: "#5b5376"
+  text-primary-color: "#ffffff"
+  divider-color: "rgba(139, 92, 255, 0.22)"
+  primary-font-family: 'system-ui, -apple-system, "Segoe UI Variable", "Segoe UI", Roboto, sans-serif'
+  ha-font-family-body: 'system-ui, -apple-system, "Segoe UI Variable", "Segoe UI", Roboto, sans-serif'
+  ha-font-family-heading: 'system-ui, -apple-system, "Segoe UI Variable", "Segoe UI", Roboto, sans-serif'
+
+  # background: dark with one soft glow
+  lovelace-background: "radial-gradient(1100px 620px at 8% -12%, rgba(255, 43, 214, 0.10), transparent 62%), #05040a"
+  app-header-background-color: "#05040a"
+  app-header-text-color: "#f5f1ff"
+  app-header-selection-bar-color: "var(--neon-pink)"
+  sidebar-background-color: "#07050f"
+  sidebar-text-color: "#d9d2f0"
+  sidebar-icon-color: "#988fb6"
+  sidebar-selected-icon-color: "var(--neon-pink)"
+  sidebar-selected-text-color: "#ffffff"
+
+  # cards: rounded, solid, a thin coloured edge. No shadows: blurred shadows on every card made phones redraw slowly (Oct 30)
+  card-background-color: "#0e0a1c"
+  ha-card-background: "#0e0a1c"
+  ha-card-border-radius: "16px"
+  ha-card-border-width: "1px"
+  ha-card-border-color: "rgba(139, 92, 255, 0.28)"
+  ha-card-box-shadow: "none"
+  ha-card-header-color: "#f5f1ff"
+  ha-badge-border-radius: "999px"
+  ha-dialog-border-radius: "24px"
+  mdc-theme-surface: "#0e0a1c"
+  ha-dialog-surface-background: "#0e0a1c"
+  code-editor-background-color: "#0b0816"
+  markdown-code-background-color: "rgba(139, 92, 255, 0.15)"
+
+  # named colors used by tiles and badges -> neon
+  pink-color: "#ff2bd6"
+  purple-color: "#b45cff"
+  deep-purple-color: "#8b5cff"
+  indigo-color: "#6a6bff"
+  blue-color: "#3b8bff"
+  light-blue-color: "#38c6ff"
+  cyan-color: "#22e4ff"
+  teal-color: "#1de9c4"
+  green-color: "#39ff88"
+  light-green-color: "#8dff4f"
+  lime-color: "#b6ff3b"
+  yellow-color: "#ffe94d"
+  amber-color: "#ffb02e"
+  orange-color: "#ff8a2b"
+  deep-orange-color: "#ff5a36"
+  red-color: "#ff4d6d"
+
+  # states
+  state-icon-color: "#988fb6"
+  state-active-color: "var(--neon-pink)"
+  state-input_boolean-active-color: "var(--neon-pink)"
+  state-switch-active-color: "var(--neon-cyan)"
+  state-script-active-color: "var(--neon-violet)"
+  state-automation-active-color: "var(--neon-lime)"
+  state-schedule-active-color: "var(--neon-violet)"
+  state-media_player-active-color: "var(--neon-cyan)"
+  state-sensor-active-color: "var(--neon-cyan)"
+
+  # controls
+  switch-checked-color: "var(--neon-pink)"
+  switch-checked-button-color: "#ffffff"
+  switch-checked-track-color: "var(--neon-pink)"
+  switch-unchecked-button-color: "#988fb6"
+  switch-unchecked-track-color: "#2a2342"
+  slider-color: "var(--neon-pink)"
+  slider-secondary-color: "rgba(255, 43, 214, 0.3)"
+  slider-track-color: "#2a2342"
+  input-fill-color: "rgba(255, 255, 255, 0.04)"
+  input-ink-color: "#f5f1ff"
+  input-label-ink-color: "#988fb6"
+  input-idle-line-color: "rgba(139, 92, 255, 0.45)"
+  input-hover-line-color: "var(--neon-pink)"
+  mdc-theme-primary: "var(--neon-pink)"
+  mdc-select-fill-color: "rgba(255, 255, 255, 0.04)"
+  mdc-select-ink-color: "#f5f1ff"
+  mdc-text-field-fill-color: "rgba(255, 255, 255, 0.04)"
+  mdc-text-field-ink-color: "#f5f1ff"
+  mdc-text-field-label-ink-color: "#988fb6"
+  paper-item-icon-color: "#988fb6"
+  paper-item-icon-active-color: "var(--neon-pink)"
+  table-row-background-color: "rgba(14, 10, 28, 0.86)"
+  table-row-alternative-background-color: "rgba(26, 18, 48, 0.86)"

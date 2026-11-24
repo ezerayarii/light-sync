@@ -1,0 +1,29 @@
+{#- sensor.room_light_theme: the Neon theme matching the brightest bedroom light (template helper "Room light theme").
+    Off = Neon Club; white / color temperature = Neon Room Warm; otherwise one of 12 hues (30 degrees each). -#}
+{%- set ns = namespace(best=none, bri=-1) -%}
+{%- for e in ['light.chambre_tvd', 'light.h6004_2', 'light.h6004'] -%}
+  {%- set s = states[e] -%}
+  {%- if s is not none and s.state == 'on' and (s.attributes.brightness or 0) > ns.bri -%}
+    {%- set ns.best = s -%}{%- set ns.bri = s.attributes.brightness or 0 -%}
+  {%- endif -%}
+{%- endfor -%}
+{%- if ns.best is none -%}
+Neon Club
+{%- else -%}
+  {%- set rgb = ns.best.attributes.rgb_color -%}
+  {%- if not rgb or ns.best.attributes.color_mode == 'color_temp' -%}
+Neon Room Warm
+  {%- else -%}
+    {%- set r, g, b = rgb[0] / 255, rgb[1] / 255, rgb[2] / 255 -%}
+    {%- set mx = [r, g, b] | max -%}{%- set mn = [r, g, b] | min -%}{%- set d = mx - mn -%}
+    {%- if mx == 0 or d / mx < 0.25 -%}
+Neon Room Warm
+    {%- else -%}
+      {%- if mx == r -%}{%- set h = (60 * (g - b) / d) % 360 -%}
+      {%- elif mx == g -%}{%- set h = 60 * (b - r) / d + 120 -%}
+      {%- else -%}{%- set h = 60 * (r - g) / d + 240 -%}{%- endif -%}
+      {%- set names = ['Red', 'Orange', 'Yellow', 'Lime', 'Green', 'Teal', 'Cyan', 'Azure', 'Blue', 'Violet', 'Magenta', 'Pink'] -%}
+Neon Room {{ names[(((h + 15) // 30) | int) % 12] }}
+    {%- endif -%}
+  {%- endif -%}
+{%- endif -%}

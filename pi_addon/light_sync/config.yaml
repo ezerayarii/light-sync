@@ -1,0 +1,57 @@
+name: Light Sync (Pi)
+version: "1.5.0"
+slug: light_sync
+description: >-
+  Keeps the bedroom Light Sync going when the laptop is closed. Stands by while the laptop runs
+  Light Sync, takes over when it stops (MeetUp mic for beats, camera for TV colors), hands back when it returns.
+arch:
+  - aarch64
+startup: application
+boot: auto
+# host network: Govee LAN control (UDP to the bulbs) and the show page on port 8090
+host_network: true
+# HA access through the Supervisor: no long-lived token to store
+homeassistant_api: true
+# the MeetUp mic, through HA's audio system (shared with Assist Microphone)
+audio: true
+# the cameras' pan / tilt / zoom controls (cameras.py; the pictures still come through HA, never from here)
+video: true
+# the Light Sync app in the sidebar (only reachable through Home Assistant: other clients get 403)
+# its own folder, read-write: it updates its files from the laptop itself (updater.py, Nov 7 - no more pasting)
+map:
+  - addons:rw
+ingress: true
+ingress_port: 8097
+panel_icon: mdi:equalizer
+panel_title: Light Sync
+options:
+  light_screen: light.chambre_tvd
+  light_beat: light.h6004_2
+  light_wash: light.h6004
+  # bulb MAC addresses: found on the network by MAC, so new IPs from the router don't matter
+  govee_screen: "02:00:00:00:00:05"
+  govee_beat: "02:00:00:00:00:06"
+  govee_wash: "02:00:00:00:00:07"
+  # read through HA, so the camera password stays in HA only. camera: the TV one (TV colors; since Oct 28 the one in
+  # front of the TV, motionEye Camera3); room_camera: the one in the room, Camera1 (Room guard, Lights follow me;
+  # empty: the TV camera does both)
+  camera: camera.room_camera
+  room_camera: camera.bedroom_camera
+  show_port: 8090
+  ambient_bright: 150
+  # TvD is an RGBIC strip (Govee H612F): colors per segment; 0 = one color. The strip starts on the screen's right
+  screen_segments: 10
+  screen_segments_from_right: true
+schema:
+  light_screen: str
+  light_beat: str
+  light_wash: str
+  govee_screen: str?
+  govee_beat: str?
+  govee_wash: str?
+  camera: str?
+  room_camera: str?
+  show_port: port
+  ambient_bright: int(1,255)
+  screen_segments: int(0,40)
+  screen_segments_from_right: bool

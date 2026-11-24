@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0e0f11">
+<title>Light Sync</title>
+<!-- Nov 6: the app rebuilt from scratch (owner: "everything, from scratch, based on my use"): calm dark, three tabs
+     (Room, Sleep, More), TvD the leading light with Corner and Top following it. Same routes as before:
+     state, live, set, scene, light, vibe, tvapp, cams, check, wifi. -->
+<style>
+:root{--bg:#0e0f11;--acc:106,140,255;--card:#16171a;--card2:#1c1d21;--line:#26282d;--text:#ececef;--muted:#8d9098;--dim:#5d6068;
+ --normal:255,196,128;--party:255,79,216;--tv:58,214,255;--tvmusic:120,140,255;--gaming:166,255,58;--gamemusic:94,255,168;--m:139,140,150}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{padding:calc(14px + env(safe-area-inset-top)) 16px calc(96px + env(safe-area-inset-bottom));max-width:560px;margin:0 auto}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+h1{font-size:28px;font-weight:700;margin:0;letter-spacing:-.01em}
+h2{font-size:13px;font-weight:600;color:var(--muted);margin:22px 4px 8px;letter-spacing:.02em}
+.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.pill{font-size:12px;padding:5px 11px;border-radius:20px;background:var(--card2);color:var(--muted)}
+.pill.on{color:#cfe9d6;background:#1d2a22}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px}
+.view{display:none}.view.on{display:block}
+/* Room (Nov 6 redesign): a live scene of the room, glass mode cards. Motion is slow and soft (no flashing:
+   the owner gets headaches), and off for "reduce motion". */
+.hero{position:relative;border-radius:28px;overflow:hidden;min-height:230px;isolation:isolate;border:1px solid rgba(255,255,255,.06);
+ background:#121317;display:flex;flex-direction:column;justify-content:flex-end;padding:18px}
+.hero .wash{position:absolute;inset:-20%;z-index:-2;background:var(--grad,linear-gradient(120deg,#1c1d22,#15161a));
+ background-size:200% 200%;filter:saturate(1.15) blur(6px);transition:opacity .8s ease;animation:pan 16s ease-in-out infinite alternate}
+@keyframes pan{0%{background-position:0% 50%}100%{background-position:100% 50%}}
+.hero canvas.wave{position:absolute;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
+.hero .shade{position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(10,11,13,0) 25%,rgba(10,11,13,.55) 65%,rgba(10,11,13,.85))}
+.hero .who small{display:flex;align-items:center;gap:6px;color:rgba(255,255,255,.85);font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+.hero .who b{display:block;font-size:38px;font-weight:800;letter-spacing:-.02em;line-height:1.05;margin-top:4px;text-shadow:0 2px 24px rgba(0,0,0,.45)}
+.hero .why{color:rgba(255,255,255,.85);font-size:14px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hero .foot{display:flex;align-items:center;gap:10px;margin-top:14px}
+.lights3{display:flex;gap:6px;flex:1;min-width:0}
+.lights3 span{display:flex;align-items:center;gap:6px;padding:5px 9px 5px 6px;border-radius:20px;background:rgba(10,11,13,.45);
+ -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);font-size:11px;color:#e6e7ea;white-space:nowrap}
+.lights3 em{font-style:normal;color:rgba(255,255,255,.6)}
+.lights3 i{width:14px;height:14px;border-radius:50%;background:#2a2c31;box-shadow:0 0 10px var(--g,transparent);transition:background .6s ease,box-shadow .6s ease}
+.beat{display:inline-block;width:8px;height:8px;border-radius:50%;background:rgb(var(--m));box-shadow:0 0 0 0 rgba(var(--m),.5);transition:box-shadow .5s ease,transform .3s ease}
+.beat.hit{box-shadow:0 0 0 7px rgba(var(--m),0);transform:scale(1.25)}
+.meter{display:flex;align-items:flex-end;gap:3px;height:30px;flex:none}
+.meter i{width:4px;border-radius:2px;background:rgba(255,255,255,.75);height:4px;transition:height .18s ease}
+.badges{display:flex;flex-wrap:wrap;gap:6px;position:absolute;top:14px;left:16px;right:16px}
+.badge{font-size:11px;padding:4px 9px;border-radius:20px;background:rgba(14,15,17,.55);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#e6e7ea;border:1px solid rgba(255,255,255,.08);animation:fade .5s ease}
+.badge.warn{color:#ffd28a}
+@keyframes fade{from{opacity:0;transform:translateY(-4px)}}
+/* Modes */
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.mode{position:relative;text-align:left;border-radius:20px;padding:14px;min-height:92px;overflow:hidden;isolation:isolate;
+ background:linear-gradient(160deg,rgba(255,255,255,.045),rgba(255,255,255,.015));border:1px solid var(--line);transition:transform .2s ease,border-color .4s ease,background .4s ease}
+.mode:active{transform:scale(.97)}
+.mode .ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:rgba(var(--m),.14);transition:background .4s ease}
+.mode svg{width:21px;height:21px;stroke:rgb(var(--m));fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.mode span{display:block;font-weight:700;margin-top:12px;font-size:15px}
+.mode em{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:1px}
+.mode:before{content:"";position:absolute;inset:-1px;z-index:-1;border-radius:inherit;opacity:0;transition:opacity .5s ease;
+ background:radial-gradient(120% 90% at 0% 0%,rgba(var(--m),.32),transparent 60%)}
+.mode.on{border-color:rgba(var(--m),.75)}
+.mode.on:before{opacity:1;animation:breathe 4s ease-in-out infinite}
+.mode.on .ic{background:rgba(var(--m),.3)}
+@keyframes breathe{50%{opacity:.6}}
+.mode.busy{opacity:.6}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.act{background:linear-gradient(160deg,rgba(255,255,255,.045),rgba(255,255,255,.015));border:1px solid var(--line);border-radius:16px;padding:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;transition:transform .2s ease}
+.act:active{transform:scale(.97)}
+.act svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+@media (prefers-reduced-motion:reduce){.hero .wash,.mode.on:before{animation:none}*{transition:none!important}}
+/* logs */
+.logs{font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;max-height:420px;overflow:auto;padding:4px 0}
+.logs div{display:flex;gap:8px;padding:5px 0;border-top:1px solid var(--line)}
+.logs div:first-child{border-top:0}
+.logs time{color:var(--dim);flex:none}
+.logs .err{color:#ff8a8a}.logs .chg{color:#9fd4ff}
+/* rows / controls */
+.rows{background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-top:1px solid var(--line);min-height:54px}
+.row:first-child{border-top:0}
+.row .t{flex:1;min-width:0}.row .t small{display:block;color:var(--muted);font-size:12px}
+.row.col{flex-direction:column;align-items:stretch;gap:8px}
+.sw{width:50px;height:30px;border-radius:15px;background:#2a2c31;position:relative;flex:none;transition:background .2s}
+.sw:after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#cfd1d6;transition:transform .2s}
+.sw.on{background:rgb(var(--acc))}#ms-body .sw.on{background:rgb(var(--m))}.sw.on:after{transform:translateX(20px);background:#fff}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{padding:8px 12px;border-radius:12px;background:var(--card2);color:var(--muted);font-size:13px}
+.seg button.on{background:rgba(var(--acc),.18);color:var(--text);box-shadow:inset 0 0 0 1px rgba(var(--acc),.6)}#ms-body .seg button.on{background:rgba(var(--m),.18);box-shadow:inset 0 0 0 1px rgba(var(--m),.6)}
+input[type=range]{width:100%;accent-color:rgb(var(--acc));height:28px}#ms-body input[type=range]{accent-color:rgb(var(--m))}
+input[type=time]{background:var(--card2);color:var(--text);border:0;border-radius:10px;padding:8px 10px;font:inherit;color-scheme:dark}
+.val{color:var(--muted);font-size:13px;min-width:44px;text-align:right}
+.btn{padding:9px 14px;border-radius:12px;background:var(--card2);font-size:14px;font-weight:600}
+.note{color:var(--muted);font-size:12px;padding:0 4px;margin-top:8px}
+.apps{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.list div{display:flex;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
+.list div:first-child{border-top:0}
+.list i{font-style:normal;width:16px;text-align:center}
+.list .fail i{color:#ff6b6b}.list .warn i{color:#ffc04d}.list .ok i{color:#6bdc8f}
+.list small{display:block;color:var(--muted)}
+.dotw{width:9px;height:9px;border-radius:50%;margin-top:5px;flex:none;background:#6bdc8f}.dotw.quiet{background:#ffc04d}.dotw.gone{background:#555}
+/* nav */
+nav{position:fixed;left:0;right:0;bottom:0;background:rgba(14,15,17,.94);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+ border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:8px 0 calc(8px + env(safe-area-inset-bottom));z-index:20}
+nav button{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--dim);padding:4px 14px}
+/* prayer */
+.pt{display:grid;grid-template-columns:1fr auto;gap:0;background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.pt div{padding:12px 16px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+.pt div:nth-child(-n+2){border-top:0}
+.pt .nx{color:var(--text);font-weight:700;background:rgba(var(--acc),.10)}
+.pt .past{color:var(--dim)}
+.pnext{font-size:14px;color:var(--muted);margin:10px 4px 0}
+.rk{font-size:96px;font-weight:800;line-height:1;text-align:center;font-variant-numeric:tabular-nums;margin:6px 0}
+.rkof{text-align:center;color:var(--muted);font-size:15px}
+.rkpos{text-align:center;font-size:22px;font-weight:600;margin:12px 0 4px;min-height:28px}
+.pbtns{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:10px}
+.pbtns button{padding:10px 0;border-radius:12px;background:var(--card2);border:1px solid var(--line);color:var(--text);font-size:13px}
+.pbtns button.cur{border-color:rgba(var(--acc),.8);background:rgba(var(--acc),.15)}
+.mvrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line)}
+.mvrow:first-child{border-top:0}
+.mvrow b{width:58px;flex:none;font-size:13px;color:var(--muted)}
+.mvrow.now b{color:var(--text)}
+.mv{font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid var(--line);color:var(--dim)}
+.mv.ok{color:var(--text);border-color:rgba(80,200,120,.55);background:rgba(80,200,120,.12)}
+.mv.cur{color:#111;background:#ffd600;border-color:#ffd600;font-weight:700}
+.plog{font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;max-height:220px;overflow:auto;margin-top:8px}
+.plog div{display:flex;gap:10px;padding:2px 0;color:var(--muted)}
+.plog div:first-child{color:var(--text)}
+nav button.on{color:var(--text)}
+nav svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#2a2c31;padding:9px 16px;
+ border-radius:14px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:40;max-width:90vw}
+.toast.on{opacity:1}
+</style>
+</head>
+<body>
+
+<div class="top"><h1 id="title">Room</h1><span class="pill" id="host">…</span></div>
+
+<!-- ROOM -->
+<section class="view on" id="v-room">
+ <div class="hero" id="hero">
+  <div class="wash" id="wash"></div><canvas class="wave" id="wave"></canvas><div class="shade"></div>
+  <div class="badges" id="badges"></div>
+  <div class="who"><small><span class="beat" id="beat"></span><span id="bpm">–</span></small><b id="modename">–</b><div class="why" id="why"></div></div>
+  <div class="foot">
+   <div class="lights3"><span><i id="d-tvd"></i>TvD <em id="p-tvd"></em></span><span><i id="d-corner"></i>Corner <em id="p-corner"></em></span><span><i id="d-top"></i>Top <em id="p-top"></em></span></div>
+   <div class="meter" id="meter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  </div>
+ </div>
+
+ <div class="modes" id="modes"></div>
+ <h2 id="ms-title">Settings</h2>
+ <div id="ms-body"></div>
+ <div class="acts">
+  <button class="act" data-scene="script.good_night"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>Good night</button>
+  <button class="act" data-scene="script.all_lights_off"><svg viewBox="0 0 24 24"><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/><path d="M12 2v10"/></svg>All off</button>
+ </div>
+
+ <h2>Automatic</h2>
+ <div class="rows">
+  <div class="row"><div class="t">Auto mode<small>a game, a film app, music, dusk: the right mode by itself</small></div><span class="sw" data-e="input_boolean.light_sync_auto_mode"></span></div>
+  <div class="row"><div class="t">Lights follow me<small id="followtxt">off when you leave the room, back when you return</small></div><span class="sw" data-e="input_boolean.lights_follow_me"></span></div>
+  <div class="row"><div class="t">Comfort<small>softer and slower Corner and Top (on by itself late at night)</small></div><span class="sw" data-e="input_boolean.light_sync_comfort"></span></div>
+ </div>
+</section>
+
+<!-- SLEEP -->
+<section class="view" id="v-sleep">
+ <h2>Wake up</h2>
+ <div class="rows">
+  <div class="row"><div class="t">Sunrise<small>the lights slowly brighten before you wake</small></div><span class="sw" data-e="input_boolean.wake_up_light"></span></div>
+  <div class="row"><div class="t">Wake at</div><input type="time" data-time="input_datetime.wake_up_time"></div>
+ </div>
+ <h2>Bedtime</h2>
+ <div class="rows">
+  <div class="row"><div class="t">Remind me at</div><input type="time" data-time="input_datetime.light_sync_bedtime"></div>
+  <div class="row"><div class="t">Bedtime reminder<small>every evening at that time</small></div><span class="sw" data-e="input_boolean.light_sync_bedtime_reminder"></span></div>
+  <div class="row"><div class="t">Late night<small>dim and warm, Comfort on (by itself 23:00–06:00)</small></div><span class="sw" data-e="input_boolean.late_night_mode"></span></div>
+ </div>
+ <h2>If you sleep now</h2>
+ <div class="card"><div class="seg" id="cycles"></div><div class="note" style="margin:10px 0 0">Wake between sleep cycles (90 min each, 15 min to fall asleep). Tap one to set the sunrise.</div></div>
+</section>
+
+<!-- MORE -->
+<section class="view" id="v-more">
+ <h2>Lights</h2>
+ <div class="rows">
+  <div class="row col"><div style="display:flex;justify-content:space-between"><div class="t">TvD · the strip<small>leads every mode but Normal</small></div><span class="val" data-v="input_number.light_sync_level_screen"></span></div><input type="range" data-n="input_number.light_sync_level_screen"></div>
+  <div class="row col"><div style="display:flex;justify-content:space-between"><div class="t">Corner<small>follows the strip's right side</small></div><span class="val" data-v="input_number.light_sync_level_beat"></span></div><input type="range" data-n="input_number.light_sync_level_beat"></div>
+  <div class="row col"><div style="display:flex;justify-content:space-between"><div class="t">Top<small>follows the strip's top</small></div><span class="val" data-v="input_number.light_sync_level_wash"></span></div><input type="range" data-n="input_number.light_sync_level_wash"></div>
+  <div class="row"><div class="t">TvD in Light Sync</div><span class="sw" data-e="input_boolean.light_sync_use_screen"></span></div>
+  <div class="row"><div class="t">Corner in Light Sync</div><span class="sw" data-e="input_boolean.light_sync_use_beat"></span></div>
+  <div class="row"><div class="t">Top in Light Sync</div><span class="sw" data-e="input_boolean.light_sync_use_wash"></span></div>
+ </div>
+ <h2>Sound</h2>
+ <div class="rows">
+  <div class="row col"><div class="t">Listen to</div><div class="seg" data-sel="input_select.music_mic"></div></div>
+  <div class="row col"><div style="display:flex;justify-content:space-between"><div class="t">Sensitivity</div><span class="val" data-v="input_number.music_sensitivity"></span></div><input type="range" data-n="input_number.music_sensitivity"></div>
+  <div class="row"><div class="t">Which source hears my music?<small id="sttxt">listens to every source for a few seconds</small></div><button class="btn" id="stbtn">Test</button></div>
+ </div>
+ <h2>Home</h2>
+ <div class="rows">
+  <div class="row"><div class="t">Room guard<small>movement alerts while you're away (numbers only)</small></div><span class="sw" data-e="input_boolean.room_guard"></span></div>
+  <div class="row"><div class="t">Switch at my usual times<small>when a habit is strong</small></div><span class="sw" data-e="input_boolean.light_sync_auto_learn"></span></div>
+ </div>
+ <h2>TV box</h2>
+ <div class="apps">
+  <button class="act" data-app="youtube">YouTube</button><button class="act" data-app="prime">Prime Video</button>
+  <button class="act" data-app="iptv">IPTV</button><button class="act" data-app="mirroring">Mirroring</button>
+ </div>
+ <div class="note" id="boxtxt"></div>
+ <h2>Screen corners</h2>
+ <div class="card">
+  <div class="note" style="margin:0 0 8px">Where the screen is in the TV camera's picture. Drag the yellow points onto the screen's corners, then Save.</div>
+  <div id="cpwrap" style="position:relative;touch-action:none;display:none;border-radius:12px;overflow:hidden">
+   <img id="cpimg" alt="" style="width:100%;display:block">
+   <svg id="cpsvg" style="position:absolute;inset:0;width:100%;height:100%" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+    <polygon id="cppoly" fill="rgba(255,214,0,.1)" stroke="#ffd600" stroke-width="3" vector-effect="non-scaling-stroke"/></svg>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:10px;align-items:center"><button class="btn" id="cpedit">Edit corners</button>
+   <button class="btn" id="cpsave" style="display:none;background:#ffd600;color:#111">Save</button><button class="btn" id="cpcancel" style="display:none">Cancel</button>
+   <span class="note" id="cpmsg" style="margin:0"></span></div>
+ </div>
+ <h2>Room camera</h2>
+ <div class="card"><div class="note" style="margin:0 0 8px">Live, nothing is saved. Only while you watch.</div>
+  <div id="rcwrap" style="display:none;border-radius:12px;overflow:hidden;background:#000"><img id="rcimg" alt="" style="width:100%;display:block"></div>
+  <div style="display:flex;gap:8px;margin-top:10px;align-items:center"><button class="btn" id="rcbtn">Watch</button><span class="note" id="rcmsg" style="margin:0"></span></div></div>
+ <h2>Cameras</h2>
+ <div class="card"><div class="list" id="cams"><div><small>Loading…</small></div></div>
+  <div style="margin-top:10px;display:flex;gap:8px"><button class="btn" id="tune">Auto-tune both</button></div><div class="list" id="tunelog" style="margin-top:6px"></div></div>
+ <h2>Wi-Fi</h2>
+ <div class="card"><div class="note" id="wfat" style="margin:0 0 6px">…</div><div class="list" id="wifi"></div></div>
+ <h2>System</h2>
+ <div class="card"><button class="btn" id="chk">Run the check</button><div class="list" id="chkrows" style="margin-top:8px"></div></div>
+ <h2>Logs</h2>
+ <div class="card"><div class="seg" id="logf"><button data-f="all" class="on">All</button><button data-f="chg">Changes</button><button data-f="err">Errors</button></div>
+  <div class="note" id="loghost" style="margin:8px 0 4px"></div><div class="logs" id="logs"></div></div>
+ <h2>Show</h2>
+ <div class="card"><button class="btn" id="showbtn">Open the music show</button></div>
+</section>
+
+
+<!-- PRAYER (Nov 8) -->
+<section class="view" id="v-prayer">
+ <h2>Today</h2>
+ <div class="pt" id="ptimes"><div>Loading…</div><div></div></div>
+ <div class="pnext" id="pnext"></div>
+ <h2>Rak'a tracker</h2>
+ <div class="card" id="ptrack">
+  <div class="note" id="pmsg" style="margin:0 0 6px">Tap the prayer to start. You get 5 s to step out of the camera's view, then pray: I follow the room camera as numbers only, nothing is saved.</div>
+  <div id="plive" style="display:none"><div class="rk" id="prk">1</div><div class="rkof" id="prkof"></div><div class="rkpos" id="ppos"></div></div>
+  <div class="pbtns" id="pbtns"></div>
+  <div id="pmoves" style="display:none;margin-top:12px"></div>
+  <div id="plogwrap" style="display:none"><h2 style="margin:14px 0 4px">Live script</h2><div class="plog" id="plog"></div></div>
+  <div style="display:flex;gap:8px;margin-top:10px"><button class="btn" id="pstop" style="display:none">Stop</button></div>
+  <div class="note" id="presult" style="margin:10px 0 0;white-space:pre-line"></div>
+ </div>
+ <h2>Dev view</h2>
+ <div class="card">
+  <div class="note" style="margin:0 0 8px">What the tracker sees: the live room camera, the cells that differ from the empty room (orange), the person it found (yellow box) and its reading. Only while this is open; nothing is saved.</div>
+  <div id="pdevwrap" style="display:none;position:relative;border-radius:12px;overflow:hidden;background:#000">
+   <img id="pdevimg" alt="" style="width:100%;display:block"><canvas id="pdevcv" style="position:absolute;inset:0;width:100%;height:100%"></canvas></div>
+  <div class="note" id="pdevtxt" style="margin:8px 0 0;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-line"></div>
+  <div style="display:flex;gap:8px;margin-top:10px"><button class="btn" id="pdevbtn">Open dev view</button></div>
+ </div>
+</section>
+
+<nav>
+ <button class="on" data-v="room"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Room</button>
+ <button data-v="sleep"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>Sleep</button>
+ <button data-v="prayer"><svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 1 0 6 6 4.5 4.5 0 1 1-6-6z"/><path d="M5 21h14M7 21v-6l5-3 5 3v6"/></svg>Prayer</button>
+ <button data-v="more"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>More</button>
+</nav>
+<div class="toast" id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let E={},L={},busy={};
+const st=e=>(E[e]||{}).state,at=e=>(E[e]||{}).attributes||{};
+function toast(t){const el=$('toast');el.textContent=t;el.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('on'),2200)}
+async function post(path,body){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);return j}
+async function set(e,v){busy[e]=Date.now();E[e]={...(E[e]||{}),state:typeof v==='boolean'?(v?'on':'off'):String(v)};render();
+ try{await post('set',{entity_id:e,value:v})}catch(err){toast('Not saved: '+err.message);busy[e]=0;load()}}
+
+// ---- the modes: the scripts the dashboard's Quick buttons run, and the sensors that say which one is on
+const ICON={normal:'<path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V18h6v-1.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z"/>',
+ party:'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+ tv:'<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M17 2l-5 5-5-5"/>',
+ tvmusic:'<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M10 11v6l5-3z"/>',
+ gaming:'<path d="M6 11h4M8 9v4M15 12h.01M18 10h.01"/><path d="M17.3 5H6.7a4 4 0 0 0-4 3.6C2.6 9.4 2 14.5 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.4-1.4A2 2 0 0 1 9.8 16h4.4a2 2 0 0 1 1.4.6L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.5-.6-6.6-.7-7.3A4 4 0 0 0 17.3 5z"/>',
+ gamemusic:'<path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>'};
+const MODES=[['normal','Normal','script.normal_light','binary_sensor.light_sync_mode_normal'],
+ ['party','Party','script.party_mode','binary_sensor.light_sync_mode_party'],
+ ['tv','TV','script.movie_time','binary_sensor.light_sync_mode_movie'],
+ ['tvmusic','TV + Music','script.movie_music','binary_sensor.light_sync_mode_movie_music'],
+ ['gaming','Gaming','script.gaming_time','binary_sensor.light_sync_mode_gaming'],
+ ['gamemusic','Game + Music','script.gaming_music','binary_sensor.light_sync_mode_game_music']];
+const HINT={normal:'white, Corner and Top',party:'dances to the music',tv:'follows the screen',tvmusic:'screen colours on the beat',gaming:'fast, from the game',gamemusic:'game colours on the beat'};
+$('modes').innerHTML=MODES.map(([k,n])=>`<button class="mode" data-k="${k}" style="--m:var(--${k})"><div class="ic"><svg viewBox="0 0 24 24">${ICON[k]}</svg></div><span>${n}</span><em>${HINT[k]}</em></button>`).join('');
+let sceneAt=0,picked=null,pickedAt=0;
+$('modes').addEventListener('click',async ev=>{const b=ev.target.closest('.mode');if(!b)return;const m=MODES.find(x=>x[0]===b.dataset.k);
+ sceneAt=Date.now();picked=m[0];pickedAt=Date.now();showSettings(picked);
+ document.querySelectorAll('.mode').forEach(x=>x.classList.toggle('on',x===b));b.classList.add('busy');
+ try{await post('scene',{entity_id:m[2]});toast(m[1])}catch(e){toast(m[1]+': '+e.message)}b.classList.remove('busy');setTimeout(load,1500)});
+document.querySelectorAll('[data-scene]').forEach(b=>b.addEventListener('click',async()=>{try{await post('scene',{entity_id:b.dataset.scene});toast(b.textContent.trim())}catch(e){toast(e.message)}setTimeout(load,1500)}));
+
+// ---- each mode's own settings (four at most)
+const SETTINGS={
+ normal:['Normal',[['lights'],['sel','input_select.light_sync_normal_scene','Scene'],['num','input_number.light_sync_normal_bright','Brightness','%'],
+  ['num','input_number.light_sync_normal_kelvin','Warmth','K'],['note','Corner and Top give the white light; TvD only if you switch it on here.']]],
+ party:['Party',[['sel','input_select.music_mic','Listen to'],['sw','input_boolean.light_sync_party_pro','Party Pro DJ','TvD plays scenes picked by the music'],
+  ['sel','input_select.light_sync_colors','Colours'],['sel','input_select.music_flash','Flash on TvD'],['sel','input_select.music_style','Movement'],
+  ['sel','input_select.light_sync_color_change','Change colour every'],['num','input_number.music_sensitivity','Sensitivity'],['num','input_number.light_sync_bright_max','Brightness','%']]],
+ tv:['TV',[['sw','input_boolean.light_sync_cinema','Cinema look','Corner and Top low and calm while the film is calm'],['num','input_number.light_sync_level_screen','TvD brightness','%'],
+  ['num','input_number.light_sync_full_volume','Full brightness at volume','%'],['note','The TV volume dims the room. Full brightness at volume: 0 = Auto (your loudest volume lately).'],
+  ['note','TvD takes the film\'s colours from the camera; Corner copies the strip\'s right side, Top its top.']]],
+ tvmusic:['TV + Music',[['sel','input_select.music_mic','Listen to'],['num','input_number.light_sync_full_volume','Full brightness at volume','%'],['sw','input_boolean.light_sync_party_pro','Party Pro DJ','TvD plays scenes picked by the music'],
+  ['sel','input_select.music_flash','Flash on TvD'],['sel','input_select.music_style','Movement'],['num','input_number.music_sensitivity','Sensitivity'],
+  ['note','Party with the TV\'s colours: the camera gives the colours, the music moves them.']]],
+ gaming:['Gaming',[['sw','input_boolean.auto_gaming','Auto gaming','Gaming starts with a game on the laptop'],['sw','input_boolean.game_music','Music in games','the beat moves the lights too']]],
+ gamemusic:['Game + Music',[['sw','input_boolean.auto_gaming','Auto gaming','Gaming starts with a game on the laptop'],['sel','input_select.music_mic','Listen to'],
+  ['num','input_number.music_sensitivity','Sensitivity']]]};
+const LIGHTS=[['light.chambre_tvd','TvD'],['light.h6004_2','Corner'],['light.h6004','Top']];
+const LBL={'Auto (laptop sound or room mic)':'Auto','Room microphone (camera)':'Room mic','Laptop microphone':'Laptop mic','Phone (Bluetooth)':'Phone',
+ 'flow back':'flow back','each own':'each own'};
+function ctrl([kind,e,label,extra]){
+ if(kind==='lights')return `<div class="row col"><div class="t">Lights on</div><div class="seg">${LIGHTS.map(([id,n])=>`<button data-light="${id}">${n}</button>`).join('')}</div></div>`;
+ if(kind==='note')return `<div class="note" style="margin:12px 4px 0">${esc(e)}</div>`;
+ if(kind==='sw')return `<div class="row"><div class="t">${esc(label)}${extra?`<small>${esc(extra)}</small>`:''}</div><span class="sw" data-e="${e}"></span></div>`;
+ if(kind==='sel')return `<div class="row col"><div class="t">${esc(label)}</div><div class="seg" data-sel="${e}"></div></div>`;
+ return `<div class="row col"><div style="display:flex;justify-content:space-between"><div class="t">${esc(label)}</div><span class="val" data-v="${e}" data-u="${extra||''}"></span></div><input type="range" data-n="${e}"></div>`}
+let shown=null;
+function showSettings(k){if(!k||k===shown)return;shown=k;const [title,items]=SETTINGS[k];
+ $('ms-title').textContent=title+' settings';$('ms-body').style.setProperty('--m',`var(--${k})`);
+ const notes=items.filter(i=>i[0]==='note'),rows=items.filter(i=>i[0]!=='note');
+ $('ms-body').innerHTML=`<div class="rows">${rows.map(ctrl).join('')}</div>`+notes.map(ctrl).join('');
+ wire($('ms-body'));$('ms-body').querySelectorAll('[data-light]').forEach(b=>b.onclick=async()=>{const on=st(b.dataset.light)!=='on';
+  E[b.dataset.light]={...(E[b.dataset.light]||{}),state:on?'on':'off'};render();
+  try{await post('light',{entity_id:b.dataset.light,on})}catch(e){toast(e.message)}setTimeout(load,1200)});render()}
+// ---- controls: switches, choices, sliders, times (data-e / data-sel / data-n / data-time)
+function wire(root){
+ root.querySelectorAll('.sw[data-e]').forEach(s=>s.onclick=()=>set(s.dataset.e,st(s.dataset.e)!=='on'));
+ root.querySelectorAll('input[data-n]').forEach(r=>{r.oninput=()=>{busy[r.dataset.n]=Date.now();showVal(r.dataset.n,r.value)};r.onchange=()=>set(r.dataset.n,Number(r.value))});
+ root.querySelectorAll('input[data-time]').forEach(t=>t.onchange=()=>set(t.dataset.time,t.value))}
+function showVal(e,v){document.querySelectorAll(`[data-v="${e}"]`).forEach(x=>{const u=x.dataset.u||(e.includes('level')?'%':'');x.textContent=(Math.round(Number(v)*100)/100)+(u?' '+u:'')})}
+wire(document);
+
+// ---- render the Home Assistant states
+function render(){const fresh=e=>Date.now()-(busy[e]||0)<1500;
+ document.querySelectorAll('.sw[data-e]').forEach(s=>s.classList.toggle('on',st(s.dataset.e)==='on'));
+ document.querySelectorAll('.seg[data-sel]').forEach(el=>{const e=el.dataset.sel,opts=at(e).options||[];
+  if(el._o!==opts.join('|')){el._o=opts.join('|');el.innerHTML=opts.map(o=>`<button data-o="${esc(o)}">${esc(LBL[o]||o)}</button>`).join('');
+   el.querySelectorAll('button').forEach(b=>b.onclick=()=>set(e,b.dataset.o))}
+  el.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.o===st(e)))});
+ document.querySelectorAll('input[data-n]').forEach(r=>{const e=r.dataset.n,a=at(e);if(a.min==null)return;
+  r.min=a.min;r.max=a.max;r.step=a.step||1;if(!fresh(e)&&document.activeElement!==r){r.value=st(e);showVal(e,st(e))}});
+ document.querySelectorAll('input[data-time]').forEach(t=>{const v=(st(t.dataset.time)||'').slice(0,5);if(v&&!fresh(t.dataset.time)&&document.activeElement!==t)t.value=v});
+ if(Date.now()-sceneAt>4000)document.querySelectorAll('.mode').forEach(b=>{const m=MODES.find(x=>x[0]===b.dataset.k);b.classList.toggle('on',st(m[3])==='on')});
+ document.querySelectorAll('[data-light]').forEach(b=>b.classList.toggle('on',st(b.dataset.light)==='on'));
+ const act=MODES.find(m=>st(m[3])==='on');if(Date.now()-pickedAt>20000)showSettings(act?act[0]:(shown||'normal'));
+ const box=st('media_player.x96q_pro_plus');$('boxtxt').textContent=box&&box!=='unavailable'?'TV box: '+box:'TV box: not reachable (is it on?)'}
+async function load(){try{const j=await (await fetch('state',{cache:'no-store'})).json();if(j.entities){E=j.entities;render()}
+ $('host').textContent=j.standby===false&&j.host==='pi'?'Pi':'Laptop';}catch(e){}}
+
+// ---- the live view: TvD's parts around the TV, Corner and Top, the mode and why
+const MNAME={normal:'Normal',party:'Party',ambient:'TV',gaming:'Gaming',paused:'Off',standby:'Standby'};
+const rgb=c=>c?`rgb(${c.map(v=>Math.round(v)).join(',')})`:'#333';
+// the "now playing" card (Nov 6): the live colours as its background, the three lights as dots
+function dot(id,pid,light){const on=light&&light.bri>0&&Math.max(...(light.rgb||[0]))>8,c=on?rgb(light.rgb):'#2a2c31';
+ const el=$(id);el.style.background=c;el.style.setProperty('--g',on?c:'transparent');$(pid).textContent=on?Math.round(light.bri/2.55)+'%':'off'}
+let liveOkAt=0;
+async function live(){let j;try{j=await (await fetch('live',{cache:'no-store'})).json()}catch(e){return}
+ // the Pi relays the laptop's live data; one slow relay answers with the Pi's own "standby" - ignore such a blip
+ // unless it lasts (Nov 6, the owner's screen recording: "Standby" flashed between two "TV" frames)
+ const idle=j.mode==='standby'||(j.mode==='paused'&&!j.running);
+ if(!idle)liveOkAt=Date.now();else if(Date.now()-liveOkAt<4000)return;
+ L=j;if(j.t)WV.off=j.t-Date.now()/1000;
+ const m=L.mode||'paused',lights=L.lights||{};let key=m==='party'&&L.tv_party?'tvmusic':m==='ambient'?'tv':m==='gaming'?(L.music_in_game?'gamemusic':'gaming'):m==='party'?'party':m==='normal'?'normal':'';
+ $('hero').style.setProperty('--m',key?`var(--${key})`:'139,140,150');
+ $('modename').textContent=key?MODES.find(x=>x[0]===key)[1]:(MNAME[m]||m);
+ const why=m==='party'&&L.dj&&L.dj.scene?`DJ · ${L.dj.scene} · ${L.dj.mood}`:m==='gaming'&&L.game?'playing '+L.game:m==='ambient'?'following the screen':m==='normal'&&L.normal?`${L.normal.bri} % · ${L.normal.k} K`:(L.source||'');
+ $('why').textContent=key==='tvmusic'&&!(L.dj&&L.dj.scene)?'TV colours on the beat':why;$('bpm').textContent=L.bpm?L.bpm+' BPM':(L.running?'listening':'paused');
+ dot('d-tvd','p-tvd',lights.screen);dot('d-corner','p-corner',lights.beat);dot('d-top','p-top',lights.wash);
+ // the card is the live colours: Top, the strip's parts (as seen left to right) and Corner, as one slow gradient
+ const segs=m==='normal'||m==='paused'?null:L.tvd_segments,lit=x=>x&&x.bri>0&&Math.max(...x.rgb)>8;
+ const stops=[];if(lit(lights.wash))stops.push(rgb(lights.wash.rgb));
+ (segs||[]).forEach(c=>{if(c&&Math.max(...c)>8){const k=255/Math.max(...c);stops.push(rgb(c.map(v=>v*k)))}});
+ if(lit(lights.beat))stops.push(rgb(lights.beat.rgb));
+ if(!stops.length&&lit(lights.screen))stops.push(rgb(lights.screen.rgb));
+ const g=stops.length>1?`linear-gradient(120deg,${stops.join(',')})`:stops.length?`linear-gradient(120deg,${stops[0]},#121317)`:'linear-gradient(120deg,#1c1d22,#15161a)';
+ const w=$('wash');if(w._g!==g){w._g=g;w.style.setProperty('--grad',g)}
+ WV.stops=stops.length?stops:['#2a2c31'];
+ // the sound: seven soft bars from the spectrum
+ const sp=L.spectrum||[],bars=$('meter').children;for(let i=0;i<bars.length;i++){const v=sp.length?sp[Math.floor(i*sp.length/bars.length)]||0:0;bars[i].style.height=(4+Math.min(1,v)*30)+'px'}
+ // what's going on, in short badges
+ const bd=[];if(L.blackout)bd.push(['warn',L.blackout==='muted'?'Muted · lights off':'Black screen · lights off']);
+ else if(L.room_on!=null&&L.room_on<0.3&&(m==='ambient'||L.tv_party))bd.push(['','Quiet · only TvD']);
+ if(L.volume_dim!=null&&L.volume_dim<0.99&&(m==='ambient'||L.tv_party))bd.push(['','Volume '+Math.round(L.volume_dim*100)+' %']);
+ if(L.comfort)bd.push(['','Comfort']);if(L.room&&L.room.here===false)bd.push(['warn','Nobody in the room']);
+ const bh=bd.map(([c,t])=>`<span class="badge ${c}">${esc(t)}</span>`).join('');if($('badges')._h!==bh){$('badges')._h=bh;$('badges').innerHTML=bh}
+ if(L.room){$('followtxt').textContent=st('input_boolean.lights_follow_me')!=='on'?'off':L.room.here===false?'you\'re out of the room: lights off':'you\'re here'+(L.room.absent_s>600?` · waits ${Math.round(L.room.absent_s/60)} min after a wrong off`:'')}
+ if(L.sound_test){const t=L.sound_test;$('sttxt').textContent=t.state==='running'?'listening…':(t.best?'best: '+t.best:t.summary||'done')}
+ const b=$('beat');if(L.beat_at&&Date.now()/1000-L.beat_at<0.25){b.classList.add('hit');setTimeout(()=>b.classList.remove('hit'),160)}}
+
+// ---- the music wave (Nov 6, owner: "a super smooth display from the song"): drawn every frame, timed to the beat
+// Light Sync predicts (beat_anchor + period, its clock matched to ours), height from the loudness - soft swells only
+const WV={stops:['#2a2c31'],e:0,off:0,swell:0,lastBeat:0};
+function waveStart(){const c=$('wave');if(!c||!c.getContext)return;const ctx=c.getContext('2d');let last=performance.now();
+ const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+ function frame(t){const dt=Math.min(0.1,(t-last)/1000);last=t;
+  const w=c.clientWidth,h=c.clientHeight,dpr=Math.min(2,devicePixelRatio||1);
+  if(c.width!==Math.round(w*dpr)||c.height!==Math.round(h*dpr)){c.width=Math.round(w*dpr);c.height=Math.round(h*dpr)}
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+  if(document.getElementById('v-room').classList.contains('on')&&L&&L.running){
+   const live=L,now=Date.now()/1000+WV.off;let ph=null;
+   if(live.period&&live.beat_anchor){ph=((now-live.beat_anchor)%live.period+live.period)%live.period/live.period}
+   // a soft swell on each beat: up in ~0.12 of the beat, down over the rest (never a flash)
+   let target=ph==null?0:(ph<0.12?ph/0.12:Math.max(0,1-(ph-0.12)/0.75));
+   if(ph==null&&live.beat_at){const age=now-live.beat_at;target=age<0||age>0.7?0:(age<0.1?age/0.1:1-(age-0.1)/0.6)}  // no steady tempo: on each heard beat
+   WV.swell+=(target-WV.swell)*Math.min(1,dt*10);
+   WV.e+=((live.energy||0)-WV.e)*Math.min(1,dt*3);
+   const amp=h*(0.05+0.13*WV.e+0.07*WV.swell)*(reduce?0.4:1),mid=h*0.58,tt=reduce?0:t/1000;
+   const g=ctx.createLinearGradient(0,0,w,0);WV.stops.forEach((col,i)=>g.addColorStop(WV.stops.length>1?i/(WV.stops.length-1):0,col));
+   for(let k=0;k<3;k++){ctx.beginPath();const sp=0.6+k*0.25,fr=1.6+k*0.7,ph0=k*1.7;
+    for(let x=0;x<=w;x+=4){const y=mid+Math.sin(x/w*Math.PI*fr+tt*sp+ph0)*amp*(1-k*0.22)+Math.sin(x/w*Math.PI*fr*2.3-tt*sp*1.3)*amp*0.25;x?ctx.lineTo(x,y):ctx.moveTo(x,y)}
+    ctx.lineTo(w,h);ctx.lineTo(0,h);ctx.closePath();ctx.globalAlpha=0.16+0.08*(2-k);ctx.fillStyle=g;ctx.fill()}
+   ctx.globalAlpha=1}
+  requestAnimationFrame(frame)}
+ requestAnimationFrame(frame)}
+waveStart();
+
+// ---- Room camera (Nov 7, owner: "the CCTV of the room back"): live while watching, nothing kept
+// live video (the camera's stream through the Pi); closing it (Stop, leaving More, the app hidden) ends the stream
+let rcOn=false;
+function rcStart(){rcOn=true;$('rcbtn').textContent='Stop';$('rcwrap').style.display='block';$('rcmsg').textContent='Connecting…';
+ const im=$('rcimg');im.onload=()=>{if(rcOn)$('rcmsg').textContent='Live'};
+ im.onerror=()=>{if(rcOn){$('rcmsg').textContent='No picture right now - trying again';setTimeout(()=>{if(rcOn)im.src='roomcam.mjpg?t='+Date.now()},3000)}};
+ im.src='roomcam.mjpg?t='+Date.now()}
+function rcStop(){rcOn=false;$('rcbtn').textContent='Watch';$('rcwrap').style.display='none';$('rcmsg').textContent='';$('rcimg').removeAttribute('src')}
+$('rcbtn').onclick=()=>{rcOn?rcStop():rcStart()};
+setInterval(()=>{if(rcOn&&(!document.getElementById('v-more').classList.contains('on')))rcStop()},1000);
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&rcOn)rcStop()});
+
+// ---- Screen corners (Nov 6, the Pi drives: the corner editor from the laptop's live view, now in the app)
+let cpQ=null,cpCrop=null;
+function cpDraw(){const svg=$('cpsvg');svg.querySelectorAll('circle').forEach(c=>c.remove());if(!cpQ)return;
+ const pts=cpQ.map(([u,v])=>[(u-cpCrop[0])/(cpCrop[2]-cpCrop[0])*1000,(v-cpCrop[1])/(cpCrop[3]-cpCrop[1])*1000]);
+ $('cppoly').setAttribute('points',pts.map(p=>p.join(',')).join(' '));
+ pts.forEach(([x,y],i)=>{const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('cx',x);c.setAttribute('cy',y);c.setAttribute('r',22);
+  c.setAttribute('fill','#ffd600');c.setAttribute('stroke','#111');c.setAttribute('stroke-width','2');
+  c.addEventListener('pointerdown',e=>{e.preventDefault();c.setPointerCapture(e.pointerId);c._d=true});
+  c.addEventListener('pointermove',e=>{if(!c._d)return;const r=svg.getBoundingClientRect();
+   const fx=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)),fy=Math.min(1,Math.max(0,(e.clientY-r.top)/r.height));
+   cpQ[i]=[cpCrop[0]+fx*(cpCrop[2]-cpCrop[0]),cpCrop[1]+fy*(cpCrop[3]-cpCrop[1])];cpDraw()});
+  c.addEventListener('pointerup',()=>{c._d=false});svg.appendChild(c)})}
+function cpMode(on){$('cpwrap').style.display=on?'block':'none';$('cpedit').style.display=on?'none':'';$('cpsave').style.display=on?'':'none';$('cpcancel').style.display=on?'':'none'}
+$('cpedit').onclick=async()=>{$('cpmsg').textContent='Taking a picture…';
+ try{const j=await (await fetch('tvpic',{cache:'no-store'})).json();if(j.error)throw new Error(j.error);
+  cpCrop=j.crop;cpQ=j.quad.map(p=>p.slice());$('cpimg').src='data:image/jpeg;base64,'+j.jpg;cpMode(true);cpDraw();$('cpmsg').textContent=''}
+ catch(e){$('cpmsg').textContent='No picture: '+e.message}};
+$('cpcancel').onclick=()=>{cpMode(false);cpQ=null;$('cpimg').src=''};
+$('cpsave').onclick=async()=>{const v=cpQ.map(([u,w])=>[u,w].map(x=>Math.min(1,Math.max(0,x)).toFixed(2)).join(',')).join(',');
+ try{await post('set',{entity_id:'input_text.light_sync_tv_box',value:v});toast('Corners saved');cpMode(false);$('cpimg').src=''}
+ catch(e){toast('Not saved: '+e.message)}};
+
+// ---- Prayer (Nov 8): today's times (ISNA, standard Asr, worked out on the Pi), and the rak'a tracker
+const PN={fajr:'Fajr',sunrise:'Sunrise',dhuhr:'Dhuhr',asr:'Asr',maghrib:'Maghrib',isha:'Isha'},PRAY=['fajr','dhuhr','asr','maghrib','isha'];
+let P=null;
+function inMin(s){s=Math.max(0,Math.round(s/60));return s>=60?`${Math.floor(s/60)} h ${s%60} min`:`${s} min`}
+function drawPrayer(){if(!P)return;const t=P.times||{};
+ $('ptimes').innerHTML=Object.keys(PN).map(n=>{const cls=n===P.next?'nx':'';return `<div class="${cls}">${PN[n]}</div><div class="${cls}">${esc(t[n]||'')}</div>`}).join('');
+ $('pnext').textContent=P.next?`Next: ${PN[P.next]} in ${inMin(P.next_at-P.now)} · ${P.method}`:'';
+ const k=P.track||{},live=k.phase==='aside'||k.phase==='tracking';
+ $('plive').style.display=live?'block':'none';$('pbtns').style.display=live?'none':'grid';$('pstop').style.display=live?'':'none';
+ if(k.phase==='aside'){$('prk').textContent=k.countdown||'';$('prkof').textContent='step out of the camera\'s view';$('ppos').textContent=''}
+ else if(k.phase==='tracking'){$('prk').textContent=k.rakaa||1;$('prkof').textContent=`rak'a of ${k.expected} · ${PN[k.prayer]||''}`;$('ppos').textContent=k.posture||''}
+ $('pmsg').style.display=live?'none':'';
+ $('presult').textContent=(!live&&k.result)?k.result.text:'';
+ drawMoves(k);
+ if(live&&!devOn&&!devClosedByMe){$('pdevbtn').click()}  // see yourself while it follows you (it opens by itself)
+ if(!live)devClosedByMe=false;
+ $('pbtns').innerHTML=PRAY.map(n=>`<button data-p="${n}" class="${n===P.current?'cur':''}">${PN[n]}<br><small>${P.rakaat[n]}</small></button>`).join('');
+ $('pbtns').querySelectorAll('button').forEach(b=>b.onclick=()=>prayerAct({action:'start',prayer:b.dataset.p}))}
+async function loadPrayer(){try{P=await (await fetch('prayer',{cache:'no-store'})).json();drawPrayer()}catch(e){$('pnext').textContent='Prayer times not reachable right now.'}}
+async function prayerAct(body){try{P=await post('prayer',body);drawPrayer()}catch(e){toast('Not started: '+e.message)}}
+$('pstop').onclick=()=>prayerAct({action:'stop'});
+setInterval(()=>{if(!document.getElementById('v-prayer').classList.contains('on'))return;const k=(P&&P.track)||{};
+ if(k.phase==='aside'||k.phase==='tracking'||!P||Date.now()/1000-(P._at||0)>30){loadPrayer();if(P)P._at=Date.now()/1000}},700);
+
+// ---- Each movement, rak'a by rak'a, and the live script (Nov 8, owner: "track each movement by my position, see
+// myself in the camera, see the script live")
+const MOVES=[['standing','Qiyam'],['ruku','Ruku'],["standing up (i'tidal)","I'tidal"],['sujood 1','Sujood 1'],['sitting','Sitting'],['sujood 2','Sujood 2'],['tashahhud','Tashahhud']];
+function drawMoves(k){const ev=k.events||[],live=k.phase==='tracking'||k.phase==='done';
+ $('pmoves').style.display=live&&k.expected?'block':'none';$('plogwrap').style.display=live&&ev.length?'block':'none';
+ if(!live||!k.expected)return;
+ const cur=k.phase==='tracking'?k.rakaa:0,last=ev.length?ev[ev.length-1]:null;let html='';
+ for(let n=1;n<=k.expected;n++){const seen=new Set(ev.filter(e=>e.rakaa===n).map(e=>e.move));
+  const tash=(n===2&&k.expected>=3)||n===k.expected;
+  html+=`<div class="mvrow ${n===cur?'now':''}"><b>Rak'a ${n}</b>`+MOVES.filter(([m])=>m!=='tashahhud'||tash).map(([m,label])=>{
+   const isCur=n===cur&&last&&last.rakaa===n&&last.move===m;return `<span class="mv ${isCur?'cur':seen.has(m)?'ok':''}">${label}</span>`}).join('')+`</div>`}
+ $('pmoves').innerHTML=html;
+ $('plog').innerHTML=ev.slice().reverse().slice(0,40).map(e=>`<div><span>${new Date(e.t*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</span><span>rak'a ${e.rakaa}</span><span>${esc(e.move)}</span><span>${e.r}</span></div>`).join('')}
+
+// ---- Dev view (Nov 8): the room camera live + what the rak'a tracker reads, drawn on top
+let devOn=false,devTimer=null,devClosedByMe=false;
+function devStop(){devOn=false;clearInterval(devTimer);$('pdevwrap').style.display='none';$('pdevimg').removeAttribute('src');$('pdevbtn').textContent='Open dev view';$('pdevtxt').textContent=''}
+async function devTick(){if(!devOn)return;if(!document.getElementById('v-prayer').classList.contains('on')||document.hidden){devStop();return}
+ try{const d=await (await fetch('prayer/dev',{cache:'no-store'})).json();const cv=$('pdevcv'),im=$('pdevimg');
+  const W=cv.clientWidth,H=cv.clientHeight;if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H}
+  const x=cv.getContext('2d');x.clearRect(0,0,W,H);
+  if(d.mask){const rows=d.mask.length,cols=rows?d.mask[0].length:0,cw=W/cols,ch=H/rows;x.fillStyle='rgba(255,140,30,.38)';
+   d.mask.forEach((r,i)=>{for(let j=0;j<r.length;j++)if(r[j]==='1')x.fillRect(j*cw,i*ch,cw+.5,ch+.5)})}
+  if(d.box&&d.grid){const [t,b,l,r]=d.box,gx=W/d.grid[0],gy=H/d.grid[1];x.strokeStyle='#ffd600';x.lineWidth=2;x.strokeRect(l*gx,t*gy,(r-l+1)*gx,(b-t+1)*gy);
+   if(d.stand_h){x.setLineDash([6,5]);x.strokeStyle='rgba(120,200,255,.9)';const yb=(b+1)*gy;
+    [['stand',1],['high',d.levels.high],['mid',d.levels.mid]].forEach(([n,f])=>{const y=yb-d.stand_h*f*gy;x.beginPath();x.moveTo(0,y);x.lineTo(W,y);x.stroke()});x.setLineDash([])}}
+  const k=d.track||{};
+  $('pdevtxt').textContent=[`position: ${d.pos||'-'}   ratio: ${d.ratio??'-'} (high >= ${d.levels.high}, mid >= ${d.levels.mid})`,
+   `height: ${d.height||0} of standing ${d.stand_h?Math.round(d.stand_h):'-'} cells   light: ${d.light??'-'}`,
+   `empty room: ${d.bg?(d.bg_age_s<120?d.bg_age_s+' s':Math.round(d.bg_age_s/60)+' min')+' old':'not known yet (track one prayer with Start)'}`,
+   `tracker: ${k.phase}${k.phase==='tracking'?` · rak'a ${k.rakaa}/${k.expected} · ${k.posture||''}${k.auto?' · started by itself':''}`:''}`,
+   `auto: ${d.auto&&d.auto.window?('watching for '+(PN[d.auto.window]||d.auto.window)+(d.auto.watching?' - someone standing still':'')):'outside a prayer\'s time (or tracked)'}`].join('\n')}
+ catch(e){$('pdevtxt').textContent='Dev view not reachable: '+e.message}}
+$('pdevbtn').onclick=()=>{if(devOn){devStop();devClosedByMe=true;return}devOn=true;$('pdevwrap').style.display='block';$('pdevimg').src='roomcam.mjpg?t='+Date.now();$('pdevbtn').textContent='Close dev view';devTick();devTimer=setInterval(devTick,350)};
+
+// ---- Logs (Nov 6): what Light Sync did, newest first; Changes = modes, the DJ, Auto, blackouts...; Errors = problems
+let logF='all';
+const LOG_ERR=/error|couldn't|can't|fail|not reachable|traceback|exception/i,
+ LOG_CHG=/mode|party|dj|auto|gaming|game|normal|tv|blackout|follow me|dusk|night|back in|taken out|switched|started|stopped|paused|standby/i;
+async function loadLogs(){if(!document.getElementById('v-more').classList.contains('on'))return;
+ try{const j=await (await fetch('logs',{cache:'no-store'})).json();
+  $('loghost').textContent=`From the ${j.host==='pi'?'Pi':'laptop'} · ${j.lines.length} lines · updates every 5 s`;
+  const rows=j.lines.slice().reverse().filter(l=>logF==='all'||(logF==='err'?LOG_ERR.test(l.text):LOG_CHG.test(l.text))).slice(0,200);
+  $('logs').innerHTML=rows.map(l=>`<div class="${LOG_ERR.test(l.text)?'err':LOG_CHG.test(l.text)?'chg':''}"><time>${new Date(l.t*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</time><span>${esc(l.text)}</span></div>`).join('')||'<div><span>Nothing here yet.</span></div>'}
+ catch(e){$('loghost').textContent='Logs not reachable right now.'}}
+document.querySelectorAll('#logf button').forEach(b=>b.onclick=()=>{logF=b.dataset.f;document.querySelectorAll('#logf button').forEach(x=>x.classList.toggle('on',x===b));loadLogs()});
+setInterval(loadLogs,5000);
+
+// ---- Sleep: wake times for sleeping now
+function cycles(){const now=new Date(),out=[];for(const c of [4,5,6]){const t=new Date(now.getTime()+(15+90*c)*60000);out.push([c,t])}
+ $('cycles').innerHTML=out.map(([c,t])=>`<button data-t="${t.toTimeString().slice(0,5)}">${t.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})} · ${c*1.5} h</button>`).join('');
+ $('cycles').querySelectorAll('button').forEach(b=>b.onclick=async()=>{await set('input_datetime.wake_up_time',b.dataset.t);if(st('input_boolean.wake_up_light')!=='on')await set('input_boolean.wake_up_light',true);toast('Sunrise at '+b.textContent.split(' ·')[0])})}
+
+// ---- More: sound test, TV box, cameras, Wi-Fi, check, show
+$('stbtn').onclick=async()=>{try{const j=await post('vibe',{sound_test:true});toast(j.summary||j.error)}catch(e){toast(e.message)}};
+document.querySelectorAll('[data-app]').forEach(b=>b.onclick=async()=>{try{await post('tvapp',{app:b.dataset.app});toast('Opening '+b.textContent)}catch(e){toast(b.textContent+': '+e.message)}});
+async function loadCams(){try{const j=await (await fetch('cams',{cache:'no-store'})).json();
+ $('cams').innerHTML=(j.cams||[]).map(c=>`<div><i>${c.at_home?'●':'○'}</i><div><b>${esc(c.label)}</b><small>${c.at_home?'at its Home position':'moved from Home'}</small></div></div>`).join('')||'<div><small>No camera with settings.</small></div>'}catch(e){$('cams').innerHTML='<div><small>Not reachable here.</small></div>'}}
+$('tune').onclick=async()=>{try{const t=await post('cams',{tune:true});tuneShow(t);setTimeout(tunePoll,1200)}catch(e){toast(e.message)}};
+function tuneShow(t){if(t&&t.steps)$('tunelog').innerHTML=t.steps.map(s=>`<div><small>${esc(s)}</small></div>`).join('')}
+async function tunePoll(){try{const t=await (await fetch('cams/tune',{cache:'no-store'})).json();tuneShow(t);if(t.running)setTimeout(tunePoll,1200);else loadCams()}catch(e){}}
+async function loadWifi(){try{const j=await (await fetch('wifi',{cache:'no-store'})).json();if(!j.rows){$('wfat').textContent=j.error||'No answer yet.';return}
+ const here=j.rows.filter(r=>r.here);$('wfat').textContent=`${here.filter(r=>r.online).length} online, ${here.filter(r=>!r.online).length} quiet`;
+ $('wifi').innerHTML=j.rows.slice(0,40).map(r=>`<div><span class="dotw ${!r.here?'gone':r.online?'':'quiet'}"></span><div><b>${esc(r.name)}</b><small>${esc(r.ip)}</small></div></div>`).join('')}catch(e){$('wfat').textContent='Not reachable here.'}}
+$('chk').onclick=async()=>{const b=$('chk');b.textContent='Checking…';try{const j=await (await fetch('check',{cache:'no-store'})).json();
+ const bad=j.checks.filter(c=>c.status==='fail').length;$('chkrows').innerHTML=`<div><small>${bad?bad+' not working':'Nothing broken'}</small></div>`+
+ j.checks.filter(c=>c.status!=='ok'||bad===0).slice(0,30).map(c=>`<div class="${c.status}"><i>${{ok:'✓',warn:'!',fail:'✗',info:'·'}[c.status]||'·'}</i><div><b>${esc(c.name)}</b><small>${esc(c.detail)}</small></div></div>`).join('')}
+ catch(e){$('chkrows').innerHTML='<div><small>Not reachable here.</small></div>'}b.textContent='Run the check'};
+$('showbtn').onclick=()=>open('show','_blank');
+
+// ---- tabs
+const TITLES={room:'Room',sleep:'Sleep',prayer:'Prayer',more:'More'};
+function go(v){document.querySelectorAll('.view').forEach(x=>x.classList.toggle('on',x.id==='v-'+v));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+ $('title').textContent=TITLES[v];scrollTo(0,0);if(v==='sleep')cycles();if(v==='prayer')loadPrayer();if(v==='more'){loadCams();loadWifi();loadLogs()}try{localStorage.setItem('ls-tab',v)}catch(e){}}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));
+try{const t=localStorage.getItem('ls-tab');if(t&&TITLES[t])go(t)}catch(e){}
+load();live();setInterval(load,4000);setInterval(live,700);
+</script>
+</body>
+</html>

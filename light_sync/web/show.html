@@ -1,0 +1,300 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Light Sync · show</title>
+<style>
+html,body{margin:0;height:100%;background:#000;overflow:hidden}
+canvas{display:block;width:100vw;height:100vh}
+#hud{position:fixed;left:16px;top:calc(14px + env(safe-area-inset-top));max-width:calc(100vw - 120px);display:flex;flex-direction:column;gap:9px;pointer-events:none;transition:opacity .6s;
+font:600 13px/1.4 system-ui,-apple-system,"Segoe UI Variable","Segoe UI",Roboto,sans-serif;color:#f5f1ff;text-shadow:0 1px 4px #000}
+#hud .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#hud .logo{font-weight:900;font-size:15px;letter-spacing:.26em;background:linear-gradient(90deg,#ff2bd6,#8b5cff,#22e4ff);
+-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 10px rgba(255,43,214,.6));text-shadow:none}
+#hud .pill{border:1px solid #ff2bd6;border-radius:999px;padding:5px 13px;color:#ffd9f6;letter-spacing:.14em;text-transform:uppercase;font-weight:800;font-size:12px;
+box-shadow:0 0 14px rgba(255,43,214,.55),inset 0 0 10px rgba(255,43,214,.25);background:rgba(0,0,0,.45);text-shadow:none}
+#hud .pill.cyan{border-color:#22e4ff;color:#d8fbff;box-shadow:0 0 14px rgba(34,228,255,.5),inset 0 0 10px rgba(34,228,255,.22)}
+#hud .pill.dim{border-color:rgba(255,255,255,.25);color:rgba(255,255,255,.7);box-shadow:none}
+#hud .keys{color:rgba(255,255,255,.55);font-weight:500;font-size:12px}
+#hud kbd{font:inherit;color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:5px;padding:0 5px;margin:0 2px}
+#bar{position:fixed;left:0;right:0;bottom:calc(12px + env(safe-area-inset-bottom));display:flex;flex-wrap:wrap;justify-content:center;gap:7px;padding:0 10px;transition:opacity .35s}
+#bar button{font:800 12px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#f5f1ff;padding:10px 13px;border-radius:999px;border:1px solid rgba(255,255,255,.28);background:rgba(8,6,18,.72)}
+#bar button.on{border-color:#ff2bd6;color:#ffd9f6;background:rgba(255,43,214,.22)}
+</style></head><body><canvas id="c"></canvas><div id="hud"></div><div id="bar"></div><script>
+const cv=document.getElementById('c'),g=cv.getContext('2d'),hud=document.getElementById('hud'),bar=document.getElementById('bar');
+const HAS_KEYS=!!(window.matchMedia&&matchMedia('(hover:hover) and (pointer:fine)').matches);
+const get=(k,d)=>{try{const v=localStorage.getItem(k);return v===null?d:v}catch(e){return d}};
+const put=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+const Q=new URLSearchParams(location.search);
+const ON_TV=Q.get('tv')==='1';   // opened by "Show on TV": the lights use the show's colors
+// a TV box (or ?lite=1): its small graphics chip lagged on the 3D room (Oct 20), so the canvas is at most 960 px wide
+// (the screen stretches it: the glows are soft anyway), a steady 30 frames a second, and lighter drawing
+let LITE=ON_TV||Q.get('lite')==='1',CAP=LITE?960:3840,TARGET=LITE?30:60;   // (a slow screen switches to it by itself)
+let W=0,H=0,D=1,scale=1,fpsAvg=TARGET,frames=0,fpsT=performance.now(),slowFor=0,fastFor=0;   // scale: lower = fewer pixels on slow screens
+function size(){D=Math.min(window.devicePixelRatio||1,2,CAP/Math.max(1,innerWidth))*scale;W=cv.width=Math.floor(innerWidth*D);H=cv.height=Math.floor(innerHeight*D);g.fillStyle='#000';g.fillRect(0,0,W,H)}
+addEventListener('resize',size);size();
+const NEON=[[255,43,214],[34,228,255],[139,92,255]];
+const STYLES=['room','heart','neon','club','concert','chill'];
+let S={bands:[0,0,0],spectrum:[],energy:0,palette:null,last_beat:0,period:null,white_at:0,big_at:0,bpm:0,mode:'paused',running:false,t:0};
+let skew=0,online=false;
+let barUntil=ON_TV?0:performance.now()+8000;
+let offset=+get('ls_offset',0),style=get('ls_style3','room'),hudOn=get('ls_hud','1')!=='0',hudUntil=performance.now()+8000;
+if(!STYLES.includes(style))style='room';
+const TAB=Math.random().toString(36).slice(2,8);   // this tab (a TV box keeps every "Show on TV" open as a new tab)
+async function poll(){
+  if(document.hidden){setTimeout(poll,1000);return}   // a tab in the background: no data, no load (and not counted as a show)
+  try{const r=await fetch(`show.json?fps=${fpsAvg|0}&q=${scale}&id=${TAB}${ON_TV?'&tv=1':''}`,{cache:'no-store'});S=await r.json();skew=S.t-Date.now()/1000;online=true}catch(e){online=false}setTimeout(poll,LITE?50:30)}
+poll();
+const lerp=(a,b,k)=>a+(b-a)*k, mix=(a,b,k)=>[lerp(a[0],b[0],k),lerp(a[1],b[1],k),lerp(a[2],b[2],k)];
+function soften(c,night){                                                   // comfort: less saturated, warm at night
+  let [r,g,b]=c.map(v=>v/255);const mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn;if(mx<.02)return[0,0,0];
+  let h=d===0?0:mx===r?((g-b)/d)%6:mx===g?(b-r)/d+2:(r-g)/d+4;h=(h/6+1)%1;let s=mx?d/mx:0;
+  if(night)h=(.97+.12*((h+.03)%1))%1;s=Math.min(s,night?.6:.55);const v=.75+.25*mx;
+  const f=(n)=>{const k=(n+h*6)%6;return v-v*s*Math.max(0,Math.min(k,4-k,1))};return[f(5)*255,f(3)*255,f(1)*255]}
+const rgba=(c,a)=>`rgba(${c[0]|0},${c[1]|0},${c[2]|0},${Math.max(0,Math.min(1,a))})`;
+// no white flashes and no shaking in any style (Oct 31, the owner's headaches): each beat moves through colour and motion
+const STY={room:{trail:.55,parts:.8,beams:1,rings:1},heart:{trail:.34,parts:.35,beams:0,rings:.8},neon:{trail:.30,parts:.8,beams:1,rings:1},club:{trail:.22,parts:1,beams:1,rings:1},
+  concert:{trail:.16,parts:.55,beams:1.4,rings:1.3},chill:{trail:.08,parts:.25,beams:.4,rings:.6}};
+let bass=0,mid=0,high=0,en=0,build=0,eShort=0,eLong=0,rot=0,pulse=0,chase=9;
+let lastBeatSeen=0,lastBigSeen=0,nextPulse=0;
+const pal=NEON.map(c=>c.slice()),spec=new Float32Array(32),rings=[],parts=[],waves=[];
+function horizon(){return H*.58}
+function beatHit(strength,big){
+  const calm=!!S.comfort;pulse=calm?.4:1;chase=0;const P=STY[style]||STY.club;
+  if(calm){strength*=.3;big=false}                                         // comfort: small, soft beat effects
+  if(style==='room'){                                                       // a ring across the floor + sparks from the lights
+    waves.push({r:.2,a:big?1:.85,c:lc.screen.slice(),w:(big?4:2.5)*D});
+    const n=Math.round((big?90:22)*P.parts*(.5+strength)*(LITE?.5:1));
+    for(let i=0;i<n;i++){const k=['screen','beat','wash'][i%3],o=ROOM[k],s=.6+Math.random()*(big?3:1.5);
+      motes.push({x:o[0],y:o[1],z:o[2],vx:(Math.random()-.5)*s,vy:(Math.random()*.8+.2)*s,vz:(Math.random()-.5)*s,l:1,c:lc[k].slice()})}
+    const mm=LITE?160:500;if(motes.length>mm)motes.splice(0,motes.length-mm);
+  }else if(style==='neon'){                                                       // shockwave along the floor + sparks off the skyline
+    waves.push({r:0,a:big?1:.8,c:(big?pal[0]:pal[1]).slice(),w:(big?5:3)*D});
+    const n=Math.round((big?120:30)*P.parts*(.5+strength)),cx=W/2,hz=horizon();
+    for(let i=0;i<n;i++){const x=cx+(Math.random()-.5)*W*.9,s=(1.5+Math.random()*(big?9:5))*D;
+      parts.push({x,y:hz,vx:(x-cx)/W*s*.8,vy:-s,l:1,c:(Math.random()<.5?pal[0]:pal[1]).slice(),z:(.8+Math.random()*1.8)*D,gr:.12*D})}
+  }else{
+    const cx=W/2,cy=H/2,R=Math.min(W,H)*(style==='heart'?.27:.2),heart=style==='heart',c0=heart?brightest():pal[1],c1=heart?lc.beat:pal[0];
+    rings.push({r:R,a:heart?(calm?.3:.55):.9,c:c0.slice(),w:(big?6:3)*D});
+    const n=Math.round((big?140:40)*P.parts*(.5+strength));
+    for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,s=(2+Math.random()*(big?14:7))*D;
+      parts.push({x:cx+Math.cos(a)*R,y:cy+Math.sin(a)*R,vx:Math.cos(a)*s,vy:Math.sin(a)*s,l:1,c:(Math.random()<.5?c1:c0).slice(),z:(1+Math.random()*2.5)*D,gr:0})}
+  }
+  const pm=LITE?300:900;if(parts.length>pm)parts.splice(0,parts.length-pm);
+}
+function glowLine(x1,y1,x2,y2,c,a,w){                                      // neon tube: wide soft pass + thin bright core
+  g.strokeStyle=rgba(c,a*.22);g.lineWidth=w*4;g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.stroke();
+  g.strokeStyle=rgba(mix(c,[255,255,255],.35),a);g.lineWidth=w;g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.stroke()}
+function drawNeon(P,dt,tNow,now){
+  const cx=W/2,hz=horizon(),M=Math.min(W,H),floor=H-hz;
+  g.globalCompositeOperation='source-over';
+  const sky=g.createLinearGradient(0,0,0,hz);                              // sky glow behind the skyline
+  sky.addColorStop(0,'rgba(0,0,0,0)');sky.addColorStop(1,rgba(pal[2],.10+.22*bass+.18*pulse));g.fillStyle=sky;g.fillRect(0,0,W,hz);
+  const sr=M*(.17+.035*bass+.03*pulse),sy=hz-sr*.12;                        // the sun, cut by scrolling stripes
+  g.save();g.beginPath();g.rect(0,0,W,hz);g.clip();
+  const sg=g.createLinearGradient(0,sy-sr,0,sy+sr*.4);sg.addColorStop(0,rgba(mix(pal[0],[255,214,120],.5),.95));sg.addColorStop(1,rgba(pal[0],.95));
+  g.fillStyle=sg;g.beginPath();g.arc(cx,sy,sr,0,Math.PI*2);g.fill();
+  g.fillStyle='#000';const sc=(tNow/1000*.35)%1;
+  const st0=sy-sr*.55;for(let k=0;k<7;k++){const f=(k+sc)/7,y=st0+f*(hz-st0),th=sr*(.012+.07*f);g.fillRect(cx-sr,y,sr*2,th)}
+  g.restore();
+  g.globalCompositeOperation='lighter';
+  const halo=g.createRadialGradient(cx,sy,sr*.6,cx,sy,sr*2.4);halo.addColorStop(0,rgba(pal[0],.18+.25*pulse));halo.addColorStop(1,rgba(pal[0],0));
+  g.fillStyle=halo;g.fillRect(cx-sr*2.4,sy-sr*2.4,sr*4.8,sr*4.8);
+  const n=64,bw=W/n;                                                        // skyline: the spectrum, bass in the middle
+  for(let i=0;i<n;i++){const k=Math.min(31,Math.floor(Math.abs(i-(n-1)/2))),v=spec[k],bh=hz*(.03+.5*v*(.55+.6*en));
+    const c=mix(pal[1],pal[0],k/31),x=i*bw;
+    g.fillStyle=rgba(c,.10+.12*v);g.fillRect(x-bw*.2,hz-bh-6*D,bw*1.4,bh+6*D);
+    g.fillStyle=rgba(mix(c,[255,255,255],.25),.55+.45*v);g.fillRect(x+bw*.2,hz-bh,bw*.6,bh);
+    g.fillStyle=rgba(c,.10*v);g.fillRect(x+bw*.2,hz,bw*.6,bh*.35)}               // reflection
+  glowLine(0,hz,W,hz,pal[1],.55+.4*pulse,1.6*D);                            // horizon line
+  let ph=S.period?(((now-S.last_beat)/S.period)%1+1)%1:((tNow/1000)*(.25+1.1*en))%1;   // the floor moves one line per beat
+  const ga=.22+.45*en+.55*pulse;
+  for(let i=0;i<16;i++){const z=i+1-ph,y=hz+floor*(1.1/(z+.1));if(y>H)continue;
+    const f=Math.min(1,(y-hz)/floor*1.6);glowLine(0,y,W,y,pal[2],ga*f,1.2*D)}
+  for(let j=-14;j<=14;j++){const x0=cx+j*W*.018,x1=cx+j*W*.16;glowLine(x0,hz,x1,H,pal[2],ga*.7,1.1*D)}
+  g.save();g.beginPath();g.rect(0,hz,W,floor);g.clip();                    // beat shockwaves across the floor
+  for(let i=waves.length-1;i>=0;i--){const w=waves[i];w.r+=dt*W*(.55+.5*en)*P.rings;w.a*=Math.pow(.2,dt);
+    g.strokeStyle=rgba(w.c,w.a*.25);g.lineWidth=w.w*4;g.beginPath();g.ellipse(cx,hz,w.r,w.r*.22,0,0,Math.PI*2);g.stroke();
+    g.strokeStyle=rgba(mix(w.c,[255,255,255],.3),w.a);g.lineWidth=w.w;g.beginPath();g.ellipse(cx,hz,w.r,w.r*.22,0,0,Math.PI*2);g.stroke();
+    if(w.a<.02||w.r>W*1.2)waves.splice(i,1)}
+  g.restore();
+  if(P.beams>0)for(let s=0;s<2;s++){                                        // lasers from the top corners
+    const ox=s?W:0,base=s?Math.PI*.75:Math.PI*.25,sw=Math.sin(tNow/1000*(.6+1.4*build)+s*2.1)*.35;
+    for(let k=0;k<3;k++){const a=base+sw+(k-1)*(.06+.1*build)*(s?-1:1),len=Math.hypot(W,H);
+      glowLine(ox,0,ox+Math.cos(a)*len,Math.sin(a)*len,k===1?pal[0]:pal[1],(.05+.25*high+.3*build+.3*pulse)*P.beams,1.2*D)}}
+}
+// ---- Room 3D: the bedroom in 3D, its three lights in their live colors (TvD strip around the screen, Corner lamp,
+// Top on the ceiling), light pools on the floor and walls, a spectrum ring, beat rings; the screen shows what plays
+const ROOM={screen:[0,1.3,5.93],beat:[-2.7,1.0,5.0],wash:[.9,2.72,3.0]};
+const lc={screen:NEON[0].slice(),beat:NEON[1].slice(),wash:NEON[2].slice()},la={screen:.5,beat:.5,wash:.5};
+const motes=[];let segs=[];
+const cam={x:0,y:1.5,z:-2.6,yaw:0,pitch:0,f:1};
+function P3(x,y,z){                                                         // world -> screen [x, y, scale]
+  const dx=x-cam.x,dy=y-cam.y,dz=z-cam.z,cy=Math.cos(cam.yaw),sy=Math.sin(cam.yaw);
+  const x1=dx*cy+dz*sy,z1=-dx*sy+dz*cy,cp=Math.cos(cam.pitch),sp=Math.sin(cam.pitch);
+  const y2=dy*cp+z1*sp,z2=-dy*sp+z1*cp;
+  return z2<.15?null:[W/2+cam.f*x1/z2,H/2-cam.f*y2/z2,cam.f/z2]}
+// a TV box: the soft glows (most of its work) go on a quarter-size layer, stretched over the room once (soft anyway)
+const GLC=document.createElement('canvas'),gq=GLC.getContext('2d');let glowTo=null;
+function glow3(x,y,z,rad,c,a){const p=P3(x,y,z);if(!p||a<=.01)return;
+  const G=glowTo||g,k=glowTo?.25:1,px=p[0]*k,py=p[1]*k,r=rad*p[2]*k;
+  const gr=G.createRadialGradient(px,py,0,px,py,r);gr.addColorStop(0,rgba(c,a));gr.addColorStop(1,rgba(c,0));G.fillStyle=gr;G.fillRect(px-r,py-r,2*r,2*r)}
+function lampGlows(){for(const k of ['beat','wash']){const o=ROOM[k];glow3(o[0],o[1],o[2],.7*(1+.4*pulse),mix(lc[k],[255,255,255],.25),.2+.7*la[k]);  // Corner lamp, Top light
+    glow3(o[0],o[1],o[2],.18,[255,255,255],.3+.6*la[k])}}
+function line3(a,b,c,al,w){const p=P3(a[0],a[1],a[2]),q=P3(b[0],b[1],b[2]);if(p&&q)glowLine(p[0],p[1],q[0],q[1],c,al,w)}
+function ring3(cx,cz,r,c,al,w){const ns=LITE?24:48;   // a TV box: 24 sides (a thick 48-sided ring cost ~1 ms a frame each)
+  g.beginPath();let first=true;for(let i=0;i<=ns;i++){const t=i/ns*Math.PI*2,p=P3(cx+Math.cos(t)*r,.01,cz+Math.sin(t)*r*.8);
+  if(!p){first=true;continue}first?g.moveTo(p[0],p[1]):g.lineTo(p[0],p[1]);first=false}
+  g.strokeStyle=rgba(c,al*.25);g.lineWidth=w*4;g.stroke();g.strokeStyle=rgba(mix(c,[255,255,255],.3),al);g.lineWidth=w;g.stroke()}
+function lightsNow(dt){
+  for(const k of ['screen','beat','wash']){const l=(S.lights||{})[k],i={screen:0,beat:1,wash:2}[k];   // the lights as they are
+    const tc=l&&l.rgb?l.rgb:pal[i],ta=l&&l.rgb?Math.max(0,Math.min(1,(l.bri||0)/255)):(online?.5:.15);
+    lc[k]=mix(lc[k],tc,Math.min(1,dt*10));la[k]=lerp(la[k],ta,Math.min(1,dt*10))}
+  const ts=S.tvd_segments&&S.tvd_segments.length?S.tvd_segments:null,n=ts?ts.length:10;
+  if(segs.length!==n)segs=Array.from({length:n},()=>lc.screen.slice());
+  for(let i=0;i<n;i++)segs[i]=mix(segs[i],ts?ts[i]:lc.screen,Math.min(1,dt*10));
+}
+const brightest=()=>la.screen>=la.beat&&la.screen>=la.wash?lc.screen:la.beat>=la.wash?lc.beat:lc.wash;
+const nowWord=()=>({party:'listening',ambient:'TV',gaming:'gaming',effects:'effects',normal:'normal',paused:'paused',standby:'standby'})[S.mode]||S.mode||'';
+// on each beat a wave runs along TvD, from its start on the desk to its far end (segments arrive far end first)
+function chaseAt(i,n){if(chase>1.35)return 0;const u=1-i/Math.max(1,n-1),d=(u-chase)/.17;return Math.exp(-d*d)*(S.comfort?.5:1)}
+function drawRoom(P,dt,tNow){
+  const t=tNow/1000*(S.comfort?.5:1),yaw=Math.sin(t*.07)*.38+Math.sin(t*.031)*.12,R=5.8;  // slow orbit around the room
+  cam.x=Math.sin(yaw)*R;cam.z=3-Math.cos(yaw)*R;cam.y=1.55+.12*Math.sin(t*.13)+.12*bass;
+  cam.yaw=yaw;cam.pitch=Math.atan2(cam.y-1.15,R);cam.f=Math.min(W,H)*(H>W?1.5:1.15)*(1+.022*pulse);   // each beat: the room leans in a little
+  lightsNow(dt);const n=segs.length;
+  g.globalCompositeOperation='lighter';
+  if(LITE){const w=Math.ceil(W/4),h=Math.ceil(H/4);if(GLC.width!==w||GLC.height!==h){GLC.width=w;GLC.height=h}
+    gq.globalCompositeOperation='source-over';gq.clearRect(0,0,w,h);gq.globalCompositeOperation='lighter';glowTo=gq}
+  glow3(0,1.3,5.95,3.4,lc.screen,.08+.32*la.screen+.12*pulse);             // light on the walls and floor, swelling on the beat
+  glow3(-3.1,1.1,5.0,2.4,lc.beat,.05+.28*la.beat+.1*pulse);glow3(-2.7,.02,5.0,2.2,lc.beat,.05+.25*la.beat+.1*pulse);
+  glow3(.9,2.78,3.0,1.7,lc.wash,.08+.32*la.wash+.1*pulse);glow3(.9,.02,3.0,3.0,lc.wash,.04+.22*la.wash+.1*pulse);
+  const ga=.1+.25*en+.3*pulse;                                              // floor grid, tinted by the nearest lights
+  const gs=LITE?1:.5;
+  for(let z=0;z<=6;z+=gs)line3([-3.2,0,z],[3.2,0,z],mix(lc.wash,lc.beat,z/6),ga,1*D);
+  for(let x=-3;x<=3.01;x+=gs)line3([x,0,0],[x,0,6],mix(lc.beat,lc.screen,(x+3)/6),ga*.8,1*D);
+  for(const [a,b] of [[[-3.2,0,6],[3.2,0,6]],[[-3.2,2.8,6],[3.2,2.8,6]],[[-3.2,0,6],[-3.2,2.8,6]],[[3.2,0,6],[3.2,2.8,6]],
+    [[-3.2,2.8,6],[-3.2,2.8,0]],[[3.2,2.8,6],[3.2,2.8,0]],[[-3.2,0,6],[-3.2,0,0]],[[3.2,0,6],[3.2,0,0]]])line3(a,b,lc.screen,.14+.18*pulse,1.2*D);
+  const m=[[-1,.75],[1,.75],[1,1.85],[-1,1.85]].map(([x,y])=>P3(x,y,5.92));  // the screen on the back wall
+  const pl=S.tvd_places&&S.tvd_places.length===n?S.tvd_places:null,path=[];   // TvD where it really is: from the desk up the right and across the top (strip_map.py)
+  for(let i=0;i<n;i++){const u=i/(n-1||1);
+    path.push(pl?[-1.05+pl[i][0]*2.1,1.92-pl[i][1]*1.12,5.95]:u<.25?[-1.05,.8+u/.25*1.1,5.95]:u<.75?[-1.05+(u-.25)/.5*2.1,1.92,5.95]:[1.05,1.9-(u-.75)/.25*1.1,5.95])}
+  for(let i=0;i<n;i++){const q=path[i],b=chaseAt(i,n);glow3(q[0],q[1],q[2],.65+.3*b,segs[i],.18+.55*la.screen*(.6+.4*pulse)+.35*b)}
+  if(LITE){lampGlows();glowTo=null;g.drawImage(GLC,0,0,W,H)}               // the glow layer, stretched (additive: same look)
+  for(const [a,b] of [[[-1.7,.72,5.9],[1.7,.72,5.9]],[[-1.7,.72,5.2],[1.7,.72,5.2]],[[-1.7,.72,5.9],[-1.7,.72,5.2]],[[1.7,.72,5.9],[1.7,.72,5.2]],[[-1.6,0,5.3],[-1.6,.72,5.3]],[[1.6,0,5.3],[1.6,.72,5.3]]])
+    line3(a,b,lc.screen,.2+.12*pulse,1*D);                                   // the desk under the screen, where TvD starts
+  if(m.every(Boolean)){g.globalCompositeOperation='source-over';g.fillStyle='rgba(4,3,10,.92)';g.beginPath();
+    m.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.closePath();g.fill();g.globalCompositeOperation='lighter';
+    const c=P3(0,1.3,5.92);if(c){const fs=Math.max(8,.15*c[2]);g.textAlign='center';g.fillStyle='rgba(255,255,255,.85)';  // what is playing
+      g.font=`800 ${fs}px system-ui,sans-serif`;g.fillText(online?(S.period&&S.bpm?`${S.bpm} BPM`:nowWord().toUpperCase()):'NOT RUNNING',c[0],c[1]-fs*.2);
+      g.font=`500 ${fs*.6}px system-ui,sans-serif`;g.fillStyle='rgba(255,255,255,.6)';
+      g.fillText(S.game?('game: '+S.game):(S.audio||'').replace(/^mic: /,''),c[0],c[1]+fs*.75);
+      if(S.analysis&&online){g.fillStyle='rgba(255,255,255,.45)';g.fillText(`${S.analysis.section} · ${S.analysis.mood}`,c[0],c[1]+fs*1.45)}}}
+  for(let i=0;i<n;i++){const q=path[i],p=P3(q[0],q[1],q[2]),b=chaseAt(i,n);if(p){g.fillStyle=rgba(mix(segs[i],[255,255,255],.35),.5+.5*la.screen);
+    g.beginPath();g.arc(p[0],p[1],Math.max(1.5,.04*p[2]*(1+.8*b)),0,Math.PI*2);g.fill()}}
+  const nb=LITE?32:48;
+  for(let i=0;i<nb;i++){const k=Math.min(31,Math.floor(Math.abs(i-(nb-1)/2)/(nb/2)*32)),v=spec[k],a=i/nb*Math.PI*2+rot*.15;   // spectrum ring
+    const x=Math.cos(a)*1.7,z=3.2+Math.sin(a)*1.4,c=mix(mix(lc.beat,lc.wash,(Math.cos(a)+1)/2),lc.screen,(Math.sin(a)+1)/2*.6);
+    line3([x,0,z],[x,.04+1.15*v*(.55+.6*en),z],c,.3+.7*v,(1.5+2*high)*D)}
+  for(let i=waves.length-1;i>=0;i--){const w=waves[i];w.r+=dt*(2.2+2*en)*P.rings;w.a*=Math.pow(.25,dt);  // beat rings on the floor
+    ring3(0,3.2,w.r,w.c,w.a,w.w);if(w.a<.03||w.r>5)waves.splice(i,1)}
+  if(!LITE)lampGlows();
+  for(let i=motes.length-1;i>=0;i--){const q=motes[i];q.x+=q.vx*dt;q.y+=q.vy*dt;q.z+=q.vz*dt;q.vy-=dt*.6;q.l-=dt*.55;   // sparks
+    if(q.l<=0||q.y<0){motes.splice(i,1);continue}const p=P3(q.x,q.y,q.z);if(p){g.fillStyle=rgba(q.c,q.l);g.beginPath();g.arc(p[0],p[1],Math.max(1,.025*p[2]*(.5+q.l)),0,Math.PI*2);g.fill()}}
+}
+// ---- Heart: the app's heart, full screen, in the lights' real colours
+function drawHeartStyle(P,dt,tNow){
+  lightsNow(dt);
+  const M=Math.min(W,H),cx=W/2,cy=H/2,calm=!!S.comfort,Rr=M*.22*(1+(calm?.05:.1)*pulse+.05*bass),n=segs.length,main=brightest();
+  g.globalCompositeOperation='lighter';g.lineCap='round';
+  let gr=g.createRadialGradient(cx,cy,Rr*.7,cx,cy,Math.max(W,H)*.6);gr.addColorStop(0,rgba(main,.03+.07*en+.07*pulse+.04*la.beat));gr.addColorStop(1,rgba(main,0));g.fillStyle=gr;g.fillRect(0,0,W,H);
+  for(let i=rings.length-1;i>=0;i--){const r=rings[i];r.r+=dt*M*(.5+.5*en)*P.rings;r.a*=Math.pow(.2,dt);
+    g.strokeStyle=rgba(r.c,r.a);g.lineWidth=r.w;g.beginPath();g.arc(cx,cy,r.r,0,Math.PI*2);g.stroke();if(r.a<.02||r.r>M)rings.splice(i,1)}
+  const nb=LITE?64:96;
+  for(let i=0;i<nb;i++){const h=i<nb/2?i:nb-1-i,k=Math.min(31,Math.floor(h/(nb/2)*32)),v=Math.min(1,spec[k]),a=rot+i/nb*Math.PI*2,r0=Rr*1.26,len=M*(.008+.19*v*(.55+.6*en));
+    g.strokeStyle=rgba(mix(segs[Math.floor(i/nb*n)]||main,main,.25),.25+.75*v);g.lineWidth=(2+2*high)*D;g.beginPath();g.moveTo(cx+Math.cos(a)*r0,cy+Math.sin(a)*r0);g.lineTo(cx+Math.cos(a)*(r0+len),cy+Math.sin(a)*(r0+len));g.stroke()}
+  for(let i=0;i<n;i++){const a0=-Math.PI/2+i/n*Math.PI*2+.05,a1=-Math.PI/2+(i+1)/n*Math.PI*2-.05;
+    g.strokeStyle=rgba(segs[i],.4+.6*la.screen+.3*chaseAt(i,n));g.lineWidth=(6+4*chaseAt(i,n))*D;g.beginPath();g.arc(cx,cy,Rr*1.12,a0,a1);g.stroke()}
+  [['beat',0],['wash',Math.PI]].forEach(([k,o])=>{const a=rot*.6+o,r=Rr*1.25+M*.13,x=cx+Math.cos(a)*r,y=cy+Math.sin(a)*r,s=M*(.03+.05*la[k])*(1+.3*pulse);
+    const q=g.createRadialGradient(x,y,0,x,y,s);q.addColorStop(0,rgba(mix(lc[k],[255,255,255],.3),.25+.75*la[k]));q.addColorStop(1,rgba(lc[k],0));g.fillStyle=q;g.fillRect(x-s,y-s,2*s,2*s)});
+  g.globalCompositeOperation='source-over';
+  gr=g.createRadialGradient(cx,cy,Rr*.45,cx,cy,Rr);gr.addColorStop(0,'rgba(8,6,18,.94)');gr.addColorStop(.72,'rgba(8,6,18,.85)');gr.addColorStop(1,rgba(main,.3+.3*pulse));
+  g.fillStyle=gr;g.beginPath();g.arc(cx,cy,Rr,0,Math.PI*2);g.fill();
+  const fs=Rr*(S.period?.62:.2);g.textAlign='center';g.textBaseline='middle';g.fillStyle='#fff';g.font=`900 ${fs}px system-ui,sans-serif`;
+  g.fillText(!online?'NOT RUNNING':S.period&&S.bpm?S.bpm:nowWord().toUpperCase(),cx,cy);g.textBaseline='alphabetic';
+}
+function drawClassic(P,dt,tNow){
+  g.globalCompositeOperation='lighter';
+  const cx=W/2,cy=H/2,M=Math.min(W,H);
+  let gr=g.createRadialGradient(cx,cy,0,cx,cy,M*.75);                      // bass bloom
+  gr.addColorStop(0,rgba(pal[2],.03+.10*bass+.08*pulse));gr.addColorStop(1,rgba(pal[2],0));g.fillStyle=gr;g.fillRect(0,0,W,H);
+  for(let i=0;i<4&&P.beams>0;i++){                                          // stage beams
+    const x=W*(.14+.24*i),ang=-Math.PI/2+Math.sin(tNow/1000*(.35+.5*build)+i*1.7)*.55,len=H*1.25,wd=(.04+.06*en+.05*pulse)*P.beams,c=i%2?pal[0]:pal[1];
+    g.beginPath();g.moveTo(x,H);g.lineTo(x+Math.cos(ang-wd)*len,H+Math.sin(ang-wd)*len);g.lineTo(x+Math.cos(ang+wd)*len,H+Math.sin(ang+wd)*len);g.closePath();
+    const lg=g.createLinearGradient(x,H,x+Math.cos(ang)*len,H+Math.sin(ang)*len);
+    lg.addColorStop(0,rgba(c,(.03+.09*en+.08*pulse)*Math.min(1,P.beams)));lg.addColorStop(1,rgba(c,0));g.fillStyle=lg;g.fill()}
+  for(let i=rings.length-1;i>=0;i--){const r=rings[i];r.r+=dt*M*(.55+.6*en)*P.rings;r.a*=Math.pow(.15,dt);   // shockwaves
+    g.strokeStyle=rgba(r.c,r.a);g.lineWidth=r.w;g.beginPath();g.arc(cx,cy,r.r,0,Math.PI*2);g.stroke();if(r.a<.02||r.r>M)rings.splice(i,1)}
+  const R=M*(.17+.05*bass+.06*pulse);g.lineCap='round';                     // spectrum ring
+  for(let i=0;i<64;i++){const k=i<32?i:63-i,v=spec[k],a=rot+i/64*Math.PI*2,len=M*(.015+.22*v*(.6+.6*en));
+    g.strokeStyle=rgba(mix(pal[0],pal[1],k/31),.35+.65*v);g.lineWidth=(2+3*high)*D;
+    g.beginPath();g.moveTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R);g.lineTo(cx+Math.cos(a)*(R+len),cy+Math.sin(a)*(R+len));g.stroke()}
+  gr=g.createRadialGradient(cx,cy,0,cx,cy,R*.95);                           // core
+  gr.addColorStop(0,rgba(mix(pal[0],[255,255,255],.35*pulse),.55+.4*pulse));gr.addColorStop(.6,rgba(pal[0],.18+.3*bass));gr.addColorStop(1,rgba(pal[0],0));
+  g.fillStyle=gr;g.beginPath();g.arc(cx,cy,R*.95,0,Math.PI*2);g.fill();
+}
+let tPrev=performance.now(),hudHtml='';
+function frame(tNow){
+  if(LITE&&tNow-tPrev<1000/TARGET-4){requestAnimationFrame(frame);return}   // TV box: every other screen refresh, evenly
+  const dtr=Math.max(0,(tNow-tPrev)/1000),dt=Math.min(.05,dtr);tPrev=tNow;   // dt for motion, dtr (real time) for fades
+  frames++;
+  if(tNow-fpsT>=1000){fpsAvg=frames*1000/(tNow-fpsT);frames=0;fpsT=tNow;   // slow screen (TV box): drop resolution until smooth
+    if(fpsAvg<TARGET*.67){slowFor++;fastFor=0}else if(fpsAvg>TARGET*.95){fastFor++;slowFor=0}else{slowFor=fastFor=0}
+    if(slowFor>=3&&scale>.5){scale-=.25;slowFor=0;size()}else if(fastFor>=10&&scale<1){scale+=.25;fastFor=0;size()}
+    else if(slowFor>=3&&!LITE){LITE=true;CAP=960;TARGET=30;scale=1;slowFor=0;size()}}   // still slow at half size: the light profile
+  const now=Date.now()/1000+skew+offset/1000;   // Light Sync's clock, shifted by the sync offset
+  const P=STY[style]||STY.club, active=online&&S.running&&S.mode!=='paused'&&S.mode!=='standby', b=S.bands||[0,0,0];
+  bass=lerp(bass,active?b[0]:0,.35);mid=lerp(mid,active?b[1]:0,.25);high=lerp(high,active?b[2]:0,.3);
+  en=lerp(en,active?S.energy:0,.2);eShort=lerp(eShort,en,dt*1.2);eLong=lerp(eLong,en,dt*.15);
+  build=lerp(build,Math.max(0,Math.min(1,(eShort-eLong)*5+high*.25-.1)),dt*1.5);
+  const src=(S.palette&&S.palette.some(c=>c[0]+c[1]+c[2]>60))?S.palette:NEON,calm=!!S.comfort;
+  for(let i=0;i<3;i++)pal[i]=mix(pal[i],calm?soften(src[i],S.night):src[i],Math.min(1,dt*(calm?1:3)));
+  const sp=S.spectrum||[];for(let i=0;i<32;i++)spec[i]=lerp(spec[i],active?(sp[i]||0):0,.4);
+  // beats: on the predicted beat once the tempo is steady, otherwise on each detected beat
+  if(active&&S.period){const k=Math.floor((now-S.last_beat)/S.period),bt=S.last_beat+k*S.period;
+    if(bt>nextPulse&&now-bt<.15){nextPulse=bt;beatHit(en,false)}}
+  else if(active&&S.last_beat>lastBeatSeen){lastBeatSeen=S.last_beat;if(now-S.last_beat<.3)beatHit(en,false)}
+  if(S.big_at>lastBigSeen){lastBigSeen=S.big_at;if(active)beatHit(1,true)}
+  pulse*=Math.pow(.02,dtr);chase=Math.min(9,chase+dtr/.38);rot+=dt*(.08+.9*build+.25*mid);
+  g.globalCompositeOperation='source-over';g.fillStyle=`rgba(0,0,0,${P.trail+.25*(1-en)})`;g.fillRect(0,0,W,H);
+  g.save();
+  if(style==='room')drawRoom(P,dt,tNow);else if(style==='heart')drawHeartStyle(P,dt,tNow);else if(style==='neon')drawNeon(P,dt,tNow,now);else drawClassic(P,dt,tNow);
+  g.globalCompositeOperation='lighter';
+  for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.x+=p.vx;p.y+=p.vy;p.vy+=p.gr;p.vx*=.975;p.vy*=.975;p.l-=dt*(.6+.4*(1-en));   // particles
+    if(p.l<=0){parts.splice(i,1);continue}g.fillStyle=rgba(p.c,p.l);g.beginPath();g.arc(p.x,p.y,p.z*(.6+p.l),0,Math.PI*2);g.fill()}
+  const sparks=style==='room'||style==='heart'?0:Math.floor(high*high*25*P.parts),top=style==='neon'?horizon():H;   // hi-hat sparkle (in the sky for neon)
+  for(let i=0;i<sparks;i++){g.fillStyle=rgba(mix(pal[1],[255,255,255],.6),.3+.6*Math.random());const s=(1+Math.random()*2)*D;g.fillRect(Math.random()*W,Math.random()*top,s,s)}
+  g.restore();
+  const barOn=performance.now()<barUntil;bar.style.opacity=barOn?1:0;bar.style.pointerEvents=barOn?'auto':'none';
+  const show=hudOn&&performance.now()<hudUntil;hud.style.opacity=show?1:0;
+  if(show){const m=online?(S.mode||'paused'):'offline',cls=m==='party'?'':m==='ambient'||m==='gaming'?' cyan':' dim';
+    const html=`<div class="row"><span class="logo">LIGHT SYNC</span><span class="pill${cls}">${online?m:'not running'}</span>`+
+      (online&&S.period&&S.bpm?`<span class="pill dim">${S.bpm} BPM</span>`:'')+`</div>`+
+      (HAS_KEYS?`<div class="keys"><kbd>F</kbd> full screen · <kbd>1</kbd>-<kbd>6</kbd> styles · <kbd>←</kbd><kbd>→</kbd> sync ${offset>0?'+':''}${offset} ms · <kbd>H</kbd> hide · ${fpsAvg|0} fps</div>`:'');
+    if(html!==hudHtml){hud.innerHTML=html;hudHtml=html}}
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+addEventListener('keydown',e=>{
+  if(e.key==='f'||e.key==='F'||e.key==='Enter'){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()}
+  else if(e.key==='ArrowUp'||e.key==='ArrowDown'){setStyle(STYLES[(STYLES.indexOf(style)+(e.key==='ArrowDown'?1:STYLES.length-1))%STYLES.length]);e.preventDefault()}
+  else if(e.key==='ArrowLeft'||e.key==='ArrowRight'){offset+=e.key==='ArrowRight'?10:-10;put('ls_offset',offset)}
+  else if('123456'.includes(e.key)&&e.key.length===1)setStyle(STYLES[+e.key-1]);
+  else if(e.key==='h'||e.key==='H'){hudOn=!hudOn;put('ls_hud',hudOn?'1':'0');buildBar()}
+  hudUntil=performance.now()+6000});
+addEventListener('mousemove',()=>{hudUntil=performance.now()+4000;barUntil=performance.now()+4000});
+// the touch controls: styles, and the text on or off. A tap brings them back; a TV box without a mouse never sees them
+function setStyle(s){style=s;put('ls_style3',s);waves.length=0;motes.length=0;rings.length=0;parts.length=0;buildBar()}
+function buildBar(){bar.innerHTML=STYLES.map(s=>`<button data-s="${s}" class="${s===style?'on':''}">${s}</button>`).join('')+`<button data-hud="1">${hudOn?'hide text':'show text'}</button>`}
+bar.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;barUntil=performance.now()+6000;
+  if(b.dataset.s)setStyle(b.dataset.s);else{hudOn=!hudOn;put('ls_hud',hudOn?'1':'0');hudUntil=performance.now()+6000;buildBar()}});
+addEventListener('pointerdown',e=>{if(!bar.contains(e.target)){const open=performance.now()<barUntil;barUntil=open?0:performance.now()+6000;hudUntil=performance.now()+6000}});
+buildBar();
+</script></body></html>

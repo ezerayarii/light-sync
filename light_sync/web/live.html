@@ -1,0 +1,192 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Light Sync · live</title>
+<style>
+:root{--bg:#05040a;--panel:rgba(14,10,28,.82);--text:#f5f1ff;--muted:#988fb6;--dim:#2a2342;
+--pink:#ff2bd6;--violet:#8b5cff;--cyan:#22e4ff;--lime:#b6ff3b;--amber:#ffb02e;--red:#ff4d6d;
+--grad:linear-gradient(90deg,var(--pink),var(--violet),var(--cyan));
+--edge:linear-gradient(135deg,rgba(255,43,214,.7),rgba(139,92,255,.25) 45%,rgba(34,228,255,.7))}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;min-height:100vh;color:var(--text);padding:22px 16px 48px;
+font:15px/1.45 system-ui,-apple-system,"Segoe UI Variable","Segoe UI",Roboto,sans-serif;
+background:radial-gradient(1100px 620px at 8% -12%,rgba(255,43,214,.20),transparent 62%),
+radial-gradient(900px 640px at 108% 112%,rgba(34,228,255,.14),transparent 62%),var(--bg)}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+background:linear-gradient(rgba(139,92,255,.07) 1px,transparent 1px) 0 0/100% 44px,
+linear-gradient(90deg,rgba(139,92,255,.07) 1px,transparent 1px) 0 0/44px 100%;
+-webkit-mask-image:linear-gradient(transparent 20%,#000);mask-image:linear-gradient(transparent 20%,#000)}
+.wrap{max-width:1080px;margin:0 auto;position:relative;z-index:1}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.logo{font-weight:900;font-size:24px;letter-spacing:.24em;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;
+filter:drop-shadow(0 0 14px rgba(255,43,214,.5))}
+.logo i{font-style:normal;opacity:.55;letter-spacing:0}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;font-weight:800;font-size:12px;letter-spacing:.16em;
+text-transform:uppercase;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.04);color:var(--muted)}
+.pill.party{color:#ffd9f6;border-color:var(--pink);box-shadow:0 0 18px rgba(255,43,214,.5),inset 0 0 14px rgba(255,43,214,.22)}
+.pill.ambient{color:#d8fbff;border-color:var(--cyan);box-shadow:0 0 18px rgba(34,228,255,.45),inset 0 0 14px rgba(34,228,255,.2)}
+.pill.gaming{color:#efffd2;border-color:var(--lime);box-shadow:0 0 18px rgba(182,255,59,.45),inset 0 0 14px rgba(182,255,59,.18)}
+.pill.off{color:var(--muted)}
+.chip{font-size:12px;color:var(--muted);padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}
+.chip b{color:var(--text);font-weight:700}
+.beat{width:12px;height:12px;border-radius:50%;background:var(--dim);transition:background .06s,box-shadow .06s}
+.beat.on{background:var(--pink);box-shadow:0 0 14px var(--pink),0 0 30px var(--pink)}
+.beat.white{background:#fff;box-shadow:0 0 18px #fff,0 0 40px #fff}
+.grid{display:grid;gap:14px}
+.lights{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+.stats{grid-template-columns:1.3fr 1fr 1fr;margin-top:14px}
+.two{grid-template-columns:1.4fr 1fr;margin-top:14px}
+.card{position:relative;border-radius:22px;padding:18px;border:1px solid transparent;
+background:linear-gradient(var(--panel),var(--panel)) padding-box,var(--edge) border-box;
+box-shadow:0 0 34px rgba(139,92,255,.14),0 14px 44px rgba(0,0,0,.55);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.label{font-size:11px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+.light{--c:139,92,255;text-align:center;padding:22px 18px;transition:box-shadow .12s;
+background:linear-gradient(var(--panel),var(--panel)) padding-box,linear-gradient(135deg,rgba(var(--c),.9),rgba(var(--c),.15) 55%,rgba(var(--c),.7)) border-box;
+box-shadow:0 0 calc(10px + 40px*var(--a,0)) rgba(var(--c),calc(.15 + .45*var(--a,0))),0 14px 44px rgba(0,0,0,.55)}
+.light.out{opacity:.45;filter:grayscale(.8)}
+.orb{width:min(128px,28vw);aspect-ratio:1;border-radius:50%;margin:4px auto 16px;
+background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.9),rgb(var(--c)) 30%,rgba(var(--c),.6) 80%,rgba(var(--c),.4) 100%);
+opacity:calc(.2 + .8*var(--a,0));box-shadow:0 0 calc(20px + 70px*var(--a,0)) rgba(var(--c),calc(.25 + .6*var(--a,0)));transition:opacity .1s,box-shadow .1s}
+.name{font-weight:900;letter-spacing:.2em;text-transform:uppercase;font-size:15px}
+.role{color:var(--muted);font-size:12px;margin-top:2px}
+.bar{height:6px;border-radius:6px;background:var(--dim);margin:14px 0 8px;overflow:hidden}
+.bar>i{display:block;height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,rgba(var(--c),.6),rgb(var(--c)));box-shadow:0 0 12px rgb(var(--c));transition:width .1s}
+.val{font-variant-numeric:tabular-nums;font-size:12px;color:var(--muted);display:flex;justify-content:space-between}
+.big{font-size:56px;line-height:1;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-.02em;margin-top:8px}
+.bpm{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;display:inline-block;transition:transform .08s}
+.bpm.hit{transform:scale(1.08)}
+.mid{font-size:34px;font-weight:900;font-variant-numeric:tabular-nums;margin-top:10px}
+.sub{color:var(--muted);font-size:12px;margin-top:6px}
+.vu{display:flex;gap:4px;height:34px;align-items:flex-end;margin-top:12px}
+.vu i{flex:1;border-radius:3px;background:var(--dim);height:100%;transition:background .06s,box-shadow .06s}
+canvas{display:block;width:100%}
+#spec{height:120px;margin-top:10px}
+#hist{height:120px;margin-top:10px}
+.cam{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.swatch{width:30px;height:30px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:#111;margin-left:auto;transition:background .2s,box-shadow .2s}
+.status{font-weight:800}
+#cam{width:100%;border-radius:14px;margin-top:12px;display:none;border:1px solid rgba(34,228,255,.35);box-shadow:0 0 22px rgba(34,228,255,.18)}
+.hint{color:var(--muted);font-size:12px;margin-top:10px}
+dl{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;margin:12px 0 0;font-size:13px}
+dt{color:var(--muted)}dd{margin:0;overflow-wrap:anywhere}
+.offline{position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:5;padding:10px 18px;border-radius:999px;font-weight:800;letter-spacing:.1em;
+background:rgba(255,77,109,.15);border:1px solid var(--red);box-shadow:0 0 20px rgba(255,77,109,.4);display:none}
+@media(max-width:720px){.stats,.two{grid-template-columns:1fr}.big{font-size:46px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head><body>
+<div class="offline" id="offline">LIGHT SYNC NOT RESPONDING</div>
+<div class="wrap">
+<header>
+ <div class="logo"><i>▓▒░</i> LIGHT SYNC <i>░▒▓</i></div>
+ <span class="pill" id="mode">connecting</span>
+ <span class="beat" id="beat"></span>
+ <span class="chip" id="src" style="margin-left:auto"></span>
+</header>
+
+<div class="grid lights" id="lights"></div>
+
+<div class="grid stats">
+ <div class="card"><div class="label">Tempo</div><div class="big"><span class="bpm" id="bpm">–</span></div>
+  <div class="sub" id="lock">waiting for a steady beat</div></div>
+ <div class="card"><div class="label">Loudness</div><div class="mid" id="energy">0%</div><div class="vu" id="vu"></div></div>
+ <div class="card"><div class="label">Beats</div><div class="mid" id="beats">0</div><div class="sub" id="flash"></div></div>
+</div>
+
+<div class="grid two">
+ <div class="card"><div class="label">Spectrum</div><canvas id="spec"></canvas></div>
+ <div class="card"><div class="label">Loudness &amp; beats · last 10 s</div><canvas id="hist"></canvas></div>
+</div>
+
+<div class="grid two">
+ <div class="card">
+  <div class="cam"><span class="label">Camera</span><span class="status" id="camst">off</span><span class="swatch" id="sw" title="color it sees"></span></div>
+  <div id="camwrap" style="position:relative;touch-action:none">
+   <img id="cam" alt="" style="width:100%;display:block">
+   <svg id="cored" style="position:absolute;inset:0;width:100%;height:100%;display:none" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+    <polygon id="corpoly" fill="rgba(255,214,0,.08)" stroke="#ffd600" stroke-width="3" vector-effect="non-scaling-stroke"/>
+   </svg>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:8px">
+   <button id="coredit" style="padding:8px 12px;border-radius:10px;border:1px solid #444;background:#1c1d21;color:#eee;cursor:pointer">Edit corners</button>
+   <button id="corsave" style="display:none;padding:8px 12px;border-radius:10px;border:0;background:#ffd600;color:#111;font-weight:700;cursor:pointer">Save</button>
+   <button id="corcancel" style="display:none;padding:8px 12px;border-radius:10px;border:1px solid #444;background:#1c1d21;color:#eee;cursor:pointer">Cancel</button>
+   <span id="cormsg" style="color:#8d9098;font-size:12px;align-self:center"></span>
+  </div>
+  <div class="hint" id="camhint">Set SNAPSHOT_URL to let the camera read the screen colors.</div>
+ </div>
+ <div class="card"><div class="label">Details</div><dl id="info"></dl></div>
+</div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const ROLES={screen:"screen color · loudness",beat:"punches on the beat",wash:"slow wash"};
+const NAMES={screen:"TvD",beat:"Corner",wash:"Top"};
+const cards={};
+function card(k,name){const d=document.createElement('div');d.className='card light';
+ d.innerHTML=`<div class="orb"></div><div class="name">${NAMES[k]||name}</div><div class="role">${ROLES[k]||''}</div><div class="bar"><i></i></div><div class="val"><span class="hex"></span><span class="pct"></span></div>`;
+ $('lights').appendChild(d);return cards[k]=d}
+const vu=$('vu');for(let i=0;i<16;i++)vu.appendChild(document.createElement('i'));
+function fit(cv){const w=cv.clientWidth*devicePixelRatio,h=cv.clientHeight*devicePixelRatio;if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h}return[w,h]}
+const hex=c=>'#'+c.map(v=>(v|0).toString(16).padStart(2,'0')).join('');
+let peaks=new Float32Array(32),lastBeat=0;
+function drawSpec(s){const cv=$('spec'),g=cv.getContext('2d'),[w,h]=fit(cv);g.clearRect(0,0,w,h);if(!s||!s.length)return;
+ const n=s.length,bw=w/n,gr=g.createLinearGradient(0,0,w,0);gr.addColorStop(0,'#ff2bd6');gr.addColorStop(.5,'#8b5cff');gr.addColorStop(1,'#22e4ff');
+ g.fillStyle=gr;g.shadowColor='rgba(139,92,255,.8)';g.shadowBlur=14*devicePixelRatio;
+ for(let i=0;i<n;i++){const v=Math.min(1,s[i]),bh=Math.max(2,v*h*.92);peaks[i]=Math.max(v,peaks[i]-.012);
+  g.fillRect(i*bw+bw*.18,h-bh,bw*.64,bh);g.fillRect(i*bw+bw*.18,h-peaks[i]*h*.92-4*devicePixelRatio,bw*.64,2*devicePixelRatio)}}
+function drawHist(hs){const cv=$('hist'),g=cv.getContext('2d'),[w,h]=fit(cv);g.clearRect(0,0,w,h);if(!hs||!hs.length)return;const st=w/200;
+ hs.forEach((p,i)=>{if(p[1]){const x=w-(hs.length-i)*st;g.fillStyle='rgba(255,43,214,.85)';g.shadowColor='#ff2bd6';g.shadowBlur=10*devicePixelRatio;g.fillRect(x,0,Math.max(2,st*.6),h)}});
+ g.shadowBlur=0;g.beginPath();hs.forEach((p,i)=>{const x=w-(hs.length-i)*st,y=h-p[0]*h*.9-2;i?g.lineTo(x,y):g.moveTo(x,y)});
+ const line=g.createLinearGradient(0,0,w,0);line.addColorStop(0,'#8b5cff');line.addColorStop(1,'#22e4ff');
+ g.strokeStyle=line;g.lineWidth=2.5*devicePixelRatio;g.shadowColor='#22e4ff';g.shadowBlur=12*devicePixelRatio;g.stroke();
+ g.lineTo(w,h);g.lineTo(w-hs.length*st,h);g.closePath();const fill=g.createLinearGradient(0,0,0,h);fill.addColorStop(0,'rgba(34,228,255,.25)');fill.addColorStop(1,'rgba(34,228,255,0)');
+ g.shadowBlur=0;g.fillStyle=fill;g.fill()}
+const MODE={party:['party ⚡','party'],ambient:['ambient ◐','ambient'],gaming:['gaming ◆','gaming'],paused:['paused','off'],standby:['standby','off']};
+let fails=0;
+// ---- the corner editor (Nov 6, owner: "let me edit the points myself"): drag the 4 yellow handles onto the
+// screen's corners in the picture, Save -> Light Sync reads exactly that part of the camera picture
+let cor=null,corCrop=null,corS=null;
+const corSvg=()=>$('cored');
+function corDraw(){const svg=corSvg();svg.querySelectorAll('circle').forEach(c=>c.remove());if(!cor)return;
+ const pts=cor.map(([u,v])=>[(u-corCrop[0])/(corCrop[2]-corCrop[0])*1000,(v-corCrop[1])/(corCrop[3]-corCrop[1])*1000]);
+ $('corpoly').setAttribute('points',pts.map(p=>p.join(',')).join(' '));
+ pts.forEach(([x,y],i)=>{const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('cx',x);c.setAttribute('cy',y);
+  c.setAttribute('r',18);c.setAttribute('fill','#ffd600');c.setAttribute('stroke','#111');c.setAttribute('stroke-width','2');c.style.cursor='grab';
+  c.addEventListener('pointerdown',e=>{e.preventDefault();c.setPointerCapture(e.pointerId);c._drag=true});
+  c.addEventListener('pointermove',e=>{if(!c._drag)return;const r=svg.getBoundingClientRect();
+   const fx=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)),fy=Math.min(1,Math.max(0,(e.clientY-r.top)/r.height));
+   cor[i]=[corCrop[0]+fx*(corCrop[2]-corCrop[0]),corCrop[1]+fy*(corCrop[3]-corCrop[1])];corDraw()});
+  c.addEventListener('pointerup',()=>{c._drag=false});svg.appendChild(c)})}
+function corMode(on){$('cored').style.display=on?'block':'none';$('coredit').style.display=on?'none':'';$('corsave').style.display=on?'':'none';
+ $('corcancel').style.display=on?'':'none';$('cormsg').textContent=on?'Drag the yellow points onto the screen\'s corners (top-left, top-right, bottom-right, bottom-left).':''}
+$('coredit').onclick=()=>{if(!corS||!corS.cam_crop||!corS.tv_quad){$('cormsg').textContent='Needs TV mode (the camera following the screen).';return}
+ corCrop=corS.cam_crop.slice();cor=corS.tv_quad.map(p=>p.slice());corMode(true);corDraw()};
+$('corcancel').onclick=()=>{cor=null;corMode(false)};
+$('corsave').onclick=async()=>{try{const r=await fetch('tvbox',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({quad:cor})});
+ const j=await r.json();corMode(false);cor=null;$('cormsg').textContent=j.ok?'Saved: the green outline moves there in a moment.':'Not saved: '+(j.error||r.status)}
+ catch(e){$('cormsg').textContent='Not saved: Light Sync not reachable'}};
+async function tick(){try{const s=await (await fetch('state',{cache:'no-store'})).json();fails=0;corS=s;$('offline').style.display='none';
+ const m=s.running===false?'paused':(s.mode||'party'),[txt,cls]=MODE[m]||[m,'off'];
+ const pill=$('mode');pill.className='pill '+cls;pill.textContent=s.music_in_game&&m==='gaming'?'gaming + music ⚡':s.music_in_game&&m==='ambient'?'tv + music ⚡':txt;
+ $('src').innerHTML=`colors <b>${s.source||'–'}</b> · audio <b>${(s.audio||'–').replace(/^mic: /,'')}</b>`;
+ for(const [k,l] of Object.entries(s.lights||{})){const c=cards[k]||card(k,l.name),[r,g,b]=l.rgb,a=Math.max(0,Math.min(1,l.bri/255));
+  c.style.setProperty('--c',`${r|0},${g|0},${b|0}`);c.style.setProperty('--a',a.toFixed(3));
+  c.querySelector('.bar>i').style.width=(a*100).toFixed(1)+'%';c.querySelector('.hex').textContent=hex(l.rgb);c.querySelector('.pct').textContent=Math.round(a*100)+'%'}
+ $('bpm').textContent=s.bpm||'–';$('beats').textContent=s.beats||0;
+ $('lock').textContent=s.locked?'locked · lights fire on the predicted beat':(s.bpm?'finding the beat…':'waiting for a steady beat');
+ const e=s.energy||0;$('energy').textContent=Math.round(e*100)+'%';
+ [...vu.children].forEach((el,i)=>{const on=i/16<e,col=i<9?'#22e4ff':i<13?'#8b5cff':'#ff2bd6';el.style.background=on?col:'';el.style.boxShadow=on?`0 0 10px ${col}`:''});
+ $('flash').textContent=`flash ${s.flash||'off'} · style ${s.style||'vibe'}`;
+ const now=Date.now()/1000,dot=$('beat');dot.className='beat'+((now-(s.white_at||0)<.15)?' white':(now-(s.beat_at||0)<.15)?' on':'');
+ if(s.beat_at&&s.beat_at!==lastBeat){lastBeat=s.beat_at;const b=$('bpm');b.classList.add('hit');setTimeout(()=>b.classList.remove('hit'),90)}
+ const cs=$('camst');cs.textContent=s.camera;cs.style.color=s.camera==='following screen'?'#b6ff3b':s.camera==='not working'?'#ff4d6d':'var(--text)';
+ const sw=$('sw');sw.style.background=s.screen_rgb?`rgb(${s.screen_rgb.join(',')})`:'#111';sw.style.boxShadow=s.screen_rgb?`0 0 18px rgb(${s.screen_rgb.join(',')})`:'none';
+ const im=$('cam'),hint=$('camhint');
+ if(s.camera!=='off'&&s.camera!=='not working'){if(!im._busy&&Date.now()-(im._t||0)>150){im._busy=true;im._t=Date.now();im.onload=im.onerror=()=>{im._busy=false};im.src='cam.jpg?'+im._t}
+  im.style.display='block';hint.textContent='Only the area around your screen is shown (privacy). Green outline = your screen as read (TV_BOX); the 9 dots = the colour read in each part.'}
+ else{im.style.display='none';hint.textContent=s.camera==='not working'?'Camera not returning a picture: check SNAPSHOT_URL (see the Light Sync window).':'Set SNAPSHOT_URL to let the camera read the screen colors.'}
+ const ctl=Object.entries(s.control||{}).map(([k,v])=>`${k.replace('light.','')}: ${v}`).join('<br>');
+ const scr=Object.entries(s.show_clients||{}).map(([ip,c])=>`${ip} · ${c.fps} fps`).join('<br>')||'none';
+ $('info').innerHTML=`<dt>Game</dt><dd>${s.game||'–'}</dd><dt>Lights</dt><dd>${ctl||'–'}</dd><dt>Show open on</dt><dd>${scr}</dd>`;
+ drawSpec(s.spectrum);drawHist(s.history)}catch(err){if(++fails>15)$('offline').style.display='block'}}
+setInterval(tick,60);tick();
+</script></body></html>

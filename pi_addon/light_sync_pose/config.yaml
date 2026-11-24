@@ -1,0 +1,13 @@
+name: Light Sync Pose
+version: "1.0.0"
+slug: light_sync_pose
+description: >-
+  A person's body points from the room camera's pictures, for Light Sync (Lights follow me, the prayer tracker).
+  Google's MoveNet on the Pi's CPU. Local only (127.0.0.1): pictures come in from Light Sync, 17 points go back,
+  nothing is kept.
+arch:
+  - aarch64
+startup: application
+boot: auto
+# host network so Light Sync (also on the host network) reaches it at 127.0.0.1:8098; it listens on 127.0.0.1 only
+host_network: true

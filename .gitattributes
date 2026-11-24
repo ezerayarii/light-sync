@@ -1,0 +1,6 @@
+# Windows scripts need CRLF; the Pi add-on runs on Linux and needs LF
+* text=auto
+*.bat text eol=crlf
+pi_addon/** text eol=lf
+*.sh text eol=lf
+*.onnx binary

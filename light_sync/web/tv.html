@@ -1,0 +1,147 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Light Sync · TV</title>
+<style>
+/* The widgets on the TV, read from across the room: big text, dark, nothing flashing. 1rem = 1 % of the height really visible
+   (set below: a TV box's Chrome keeps its bar, so 100vh is taller than the screen and the bottom row was cut off, Nov 2). */
+:root{--text:#f5f1ff;--muted:#a59cc4;--panel:#0e0a1c;--rc:139,92,255}
+*{box-sizing:border-box}
+html{font-size:1vh}
+html,body{margin:0;height:100%;background:#05040a;color:var(--text);overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{background:radial-gradient(120rem 70rem at 10% -10%,rgba(var(--rc),.16),transparent 60%),#05040a;transition:opacity 2s}
+body.night{opacity:.6}
+.grid{height:100%;padding:3.2rem 3vw;display:grid;grid-template-columns:1.2fr 1fr 1.25fr;grid-template-rows:auto 1fr auto;gap:2.2rem 1.8vw}
+.card{background:var(--panel);border:1px solid rgba(var(--rc),.42);border-radius:2.2rem;padding:2.2rem;transition:border-color 1.5s,opacity 1.5s}
+.label{color:var(--muted);font-size:1.9rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
+#clock{grid-column:1/3;align-self:start;transition:opacity 1.5s}
+#time{font-size:19rem;line-height:.92;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;text-shadow:0 0 4rem rgba(var(--rc),.35)}
+#time small{font-size:5.5rem;font-weight:700;color:var(--muted);letter-spacing:0;margin-left:1.2rem;text-shadow:none}
+#date{font-size:4.2rem;color:var(--muted);font-weight:600;margin-top:1rem}
+#weather{grid-column:3;grid-row:1/3;display:flex;flex-direction:column;gap:1.6rem;min-height:0}
+.now{display:flex;align-items:center;gap:2.2rem}
+.now svg{width:12rem;height:12rem;flex:none}
+#temp{font-size:10rem;font-weight:800;line-height:1}
+#cond{font-size:3.1rem;font-weight:600;margin-top:.5rem}
+#extra{font-size:2.3rem;color:var(--muted);margin-top:.4rem}
+.days{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-top:auto}
+.day{text-align:center;padding:1.3rem .4rem;border-radius:1.5rem;background:rgba(255,255,255,.035)}
+.day b{display:block;font-size:2.2rem;color:var(--muted);font-weight:700}
+.day svg{width:5.5rem;height:5.5rem;display:block;margin:.5rem auto}
+.day span{font-size:2.5rem;font-weight:700}.day i{font-style:normal;color:var(--muted);font-size:2.1rem;margin-left:.4rem}
+#heartbox{grid-column:1;grid-row:2;position:relative;min-height:0;padding:0;overflow:hidden}
+#heart{position:absolute;inset:0;width:100%;height:100%}
+.core{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+#bpm{font-size:7rem;font-weight:900;line-height:1}#bpm.word{font-size:2.7rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+#unit{font-size:1.7rem;color:var(--muted);font-weight:800;letter-spacing:.2em;margin-top:.4rem}
+#mood{position:absolute;left:0;right:0;bottom:1.6rem;text-align:center;font-size:2.1rem;color:var(--muted);font-weight:700}
+#lights{grid-column:2;grid-row:2;display:flex;flex-direction:column;justify-content:space-between;gap:.6rem;min-height:0;overflow:hidden}
+#mode{font-size:4rem;font-weight:800;margin-top:.6rem}
+.lamp{display:flex;align-items:center;gap:1.4rem;font-size:2.8rem;font-weight:700}
+.lamp i{width:3.8rem;height:3.8rem;border-radius:50%;flex:none;background:#2a2342;transition:background .6s,box-shadow .6s}
+.lamp span{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
+.strip{grid-column:1/4;display:grid;grid-template-columns:repeat(6,1fr);gap:1.2vw}
+.strip .card{padding:1.5rem 1.8rem;min-width:0}
+.strip b{display:block;font-size:3rem;font-weight:700;margin-top:.4rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.strip small{display:block;font-size:2rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#dot{display:inline-block;width:2.2rem;height:2.2rem;border-radius:50%;background:#39ff88;margin-right:1rem;vertical-align:-.2rem}
+#dot.bad{background:#ffb02e}
+/* TV mode or a film: the widgets step back, the clock stays */
+body.dim .grid>*:not(#clock){opacity:.28}
+#rocky{position:fixed;top:2.4rem;left:50%;transform:translateX(-50%);padding:1.4rem 3rem;border-radius:99rem;font-size:3rem;font-weight:800;background:rgba(14,10,28,.92);
+border:2px solid rgb(40,110,255);opacity:0;transition:opacity .4s}
+#rocky.on{opacity:1}
+</style></head><body>
+<div class="grid">
+ <div id="clock"><div id="time">--:--</div><div id="date"></div></div>
+ <div id="weather" class="card"><div class="label">Weather</div>
+  <div class="now"><span id="icon"></span><div><div id="temp">–</div><div id="cond"></div><div id="extra"></div></div></div>
+  <div class="days" id="days"></div></div>
+ <div id="heartbox" class="card"><canvas id="heart"></canvas><div class="core"><div id="bpm" class="word">–</div><div id="unit">BPM</div></div><div id="mood"></div></div>
+ <div id="lights" class="card"><div><div class="label">Lights</div><div id="mode">–</div></div>
+  <div class="lamp"><i id="l-screen"></i>TvD<span id="p-screen"></span></div>
+  <div class="lamp"><i id="l-beat"></i>Corner<span id="p-beat"></span></div>
+  <div class="lamp"><i id="l-wash"></i>Top<span id="p-wash"></span></div></div>
+ <div class="strip">
+  <div class="card"><span class="label">Wake-up</span><b id="wake">–</b></div>
+  <div class="card"><span class="label">Sun</span><b id="sun">–</b><small id="sun2"></small></div>
+  <div class="card"><span class="label">On the TV</span><b id="box">–</b></div>
+  <div class="card"><span class="label">Internet</span><b id="net">–</b><small id="net2"></small></div>
+  <div class="card"><span class="label">Pi</span><b id="pi">–</b><small id="pi2"></small></div>
+  <div class="card"><span class="label">Home</span><b><span id="dot"></span><span id="status">–</span></b><small id="home2"></small></div>
+ </div>
+</div>
+<div id="rocky">Rocky is listening…</div>
+<script>
+const $=id=>document.getElementById(id);
+function unit(){document.documentElement.style.fontSize=(window.innerHeight/100)+'px'}addEventListener('resize',unit);unit();
+// OK on the remote (or a click): full screen, so Chrome's bar goes away
+function full(){const d=document.documentElement;if(!document.fullscreenElement&&d.requestFullscreen)d.requestFullscreen().catch(()=>{})}
+addEventListener('keydown',e=>{if(e.key==='Enter'||e.keyCode===23)full()});addEventListener('click',full);
+let T={},L={},skew=-Infinity,tzSkew=0;
+const ICONS={sun:'<circle cx="32" cy="32" r="12" fill="#ffc53d"/><g stroke="#ffc53d" stroke-width="4" stroke-linecap="round"><path d="M32 6v7M32 51v7M6 32h7M51 32h7M13.6 13.6l5 5M45.4 45.4l5 5M13.6 50.4l5-5M45.4 18.6l5-5"/></g>',
+ moon:'<path d="M43 44a19 19 0 0 1-16-30 20 20 0 1 0 25 25 19 19 0 0 1-9 5z" fill="#c9c2ff"/>',
+ cloud:'<path d="M20 48a11 11 0 0 1-1-22 14 14 0 0 1 27-2 12 12 0 0 1-1 24z" fill="#b9b6d3"/>',
+ part:'<circle cx="23" cy="22" r="9" fill="#ffc53d"/><path d="M24 50a10 10 0 0 1-1-20 13 13 0 0 1 25-1 10.500 10.500 0 0 1-1 21z" fill="#b9b6d3"/>',
+ rain:'<path d="M20 38a10 10 0 0 1-1-20 13 13 0 0 1 25-2 11 11 0 0 1-1 22z" fill="#b9b6d3"/><g stroke="#5cb8ff" stroke-width="4" stroke-linecap="round"><path d="M22 44l-3 8M33 44l-3 8M44 44l-3 8"/></g>',
+ storm:'<path d="M20 36a10 10 0 0 1-1-20 13 13 0 0 1 25-2 11 11 0 0 1-1 22z" fill="#8f8bb0"/><path d="M34 34l-8 13h7l-3 11 11-15h-7l4-9z" fill="#ffc53d"/>',
+ snow:'<path d="M20 38a10 10 0 0 1-1-20 13 13 0 0 1 25-2 11 11 0 0 1-1 22z" fill="#b9b6d3"/><g fill="#dff3ff"><circle cx="22" cy="48" r="3"/><circle cx="33" cy="52" r="3"/><circle cx="44" cy="48" r="3"/></g>',
+ fog:'<g stroke="#b9b6d3" stroke-width="5" stroke-linecap="round"><path d="M12 24h40M8 34h48M14 44h36"/></g>'};
+const KIND={sunny:'sun','clear-night':'moon',cloudy:'cloud',partlycloudy:'part',rainy:'rain',pouring:'rain',lightning:'storm','lightning-rainy':'storm',snowy:'snow','snowy-rainy':'snow',hail:'snow',fog:'fog',windy:'cloud','windy-variant':'cloud',exceptional:'cloud'};
+const WORD={sunny:'Sunny','clear-night':'Clear',cloudy:'Cloudy',partlycloudy:'Partly cloudy',rainy:'Rain',pouring:'Heavy rain',lightning:'Storm','lightning-rainy':'Storm',snowy:'Snow','snowy-rainy':'Sleet',hail:'Hail',fog:'Fog',windy:'Windy','windy-variant':'Windy',exceptional:'Unusual weather'};
+const svg=c=>`<svg viewBox="0 0 64 64">${ICONS[KIND[c]||'cloud']}</svg>`;
+const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],DAYN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const localHour=()=>new Date(Date.now()+tzSkew*1000).getUTCHours();
+function clock(){   // the laptop's or Pi's own time zone: a TV box's clock can be off
+ const d=new Date(Date.now()+tzSkew*1000),h=d.getUTCHours(),m=d.getUTCMinutes();
+ $('time').innerHTML=`${h%12||12}:${String(m).padStart(2,'0')}<small>${h<12?'AM':'PM'}</small>`;
+ $('date').textContent=`${DAYN[d.getUTCDay()]}, ${MON[d.getUTCMonth()]} ${d.getUTCDate()}`;
+ document.body.classList.toggle('night',h>=23||h<7)}
+async function slow(){try{T=await (await fetch('tv.json',{cache:'no-store'})).json();
+  tzSkew=T.local_t-Date.now()/1000;const w=T.weather||{};
+  if(w.condition){$('icon').innerHTML=svg(w.condition);$('temp').textContent=`${Math.round(w.temperature)}°`;$('cond').textContent=WORD[w.condition]||w.condition;
+   $('extra').textContent=`Humidity ${w.humidity??'–'} %${w.wind!=null?` · wind ${Math.round(w.wind)} ${w.wind_unit||''}`:''}`}
+  $('days').innerHTML=(T.days||[]).slice(0,4).map(f=>{const d=new Date(f.at*1000+(T.tz_s||0)*1000);return `<div class="day"><b>${DAYS[d.getUTCDay()]}</b>${svg(f.condition==='clear-night'?'sunny':f.condition)}<span>${Math.round(f.high)}°</span><i>${f.low!=null?Math.round(f.low)+'°':''}</i></div>`}).join('');
+  $('wake').textContent=T.wake||'off';
+  const am=localHour()<12;   // the morning shows the sunset to come, the evening the next sunrise
+  $('sun').textContent=T.sunset&&T.sunrise?(am?`↓ ${T.sunset}`:`↑ ${T.sunrise}`):'–';$('sun2').textContent=T.sunset&&T.sunrise?(am?'sunset':'sunrise'):'';
+  $('box').textContent=T.box||'off';
+  const n=T.net||{};$('net').textContent=n.down!=null?`↓ ${n.down} Mbit/s`:'–';$('net2').textContent=n.up!=null?`↑ ${n.up} · ping ${n.ping} ms`:'';
+  const p=T.pi||{};$('pi').textContent=p.heat!=null?`${p.heat}°F`:'–';$('pi2').textContent=p.disk!=null?`disk ${p.disk} %${T.updates?` · ${T.updates} update${T.updates>1?'s':''}`:''}`:'';
+  $('status').textContent=T.status||'–';$('dot').className=T.ok===false?'bad':'';
+  $('home2').textContent=T.wifi?`${T.wifi.now} on the Wi-Fi${T.wifi.new_today?` · ${T.wifi.new_today} new today`:''}`:`lights on the ${T.host||'laptop'}`;
+  clock()}catch(e){}setTimeout(slow,T.status?30000:3000)}   // the first answer can come before the data does
+const MODES={party:'Music',ambient:'TV',gaming:'Gaming',effects:'Effects',normal:'Normal',paused:'Lights off',standby:'Standby'};
+function lightsNow(){const m=L.mode||'paused',l=L.lights||{};let on=false,best=null;
+ for(const k of ['screen','beat','wash']){const x=l[k],lit=x&&x.bri>0&&x.rgb;on=on||!!lit;if(lit&&(!best||x.bri>best.bri))best=x;
+  const c=lit?`rgb(${x.rgb.map(v=>v|0).join(',')})`:'#2a2342';$('l-'+k).style.background=c;$('l-'+k).style.boxShadow=lit?`0 0 1.8rem ${c}`:'none';$('p-'+k).textContent=lit?Math.round(x.bri/2.55)+' %':'off'}
+ // the screen in the room's colour: the brightest light tints the edges, the glow and the clock
+ document.documentElement.style.setProperty('--rc',best?best.rgb.map(v=>v|0).join(','):'139,92,255');
+ document.body.classList.toggle('dim',m==='ambient');   // TV mode or a film: step back
+ const word=m==='paused'&&on?'Normal':(MODES[m]||m),steady=L.bpm&&L.locked;$('mode').textContent=word;
+ const b=$('bpm');b.textContent=steady?L.bpm:(m==='party'?'listening':word);b.className=steady?'':'word';$('unit').style.display=steady?'':'none';
+ const a=L.analysis||{};$('mood').textContent=m==='party'&&steady&&a.mood?`${a.mood}${a.section?' · '+a.section:''}`:'';
+ const v=L.voice||{},talk=(v.cue==='listening'||v.cue==='thinking')&&v.age<15;$('rocky').classList.toggle('on',talk);
+ if(talk)$('rocky').textContent=v.cue==='thinking'?'Rocky is thinking…':'Rocky is listening…'}
+async function live(){if(!document.hidden){try{L=await (await fetch('live.json',{cache:'no-store'})).json();skew=Math.max(L.t-Date.now()/1000,skew-.002);lightsNow()}catch(e){}}
+ setTimeout(live,document.hidden?1000:120)}
+// ---- the heart: light, for a TV box. On the predicted beat; never a white flash
+const H={c:{screen:[90,80,130],beat:[90,80,130],wash:[90,80,130]},a:{screen:0,beat:0,wash:0},sw:0,en:0,rot:0,spec:new Float32Array(32),segs:[],waves:[],next:0,seen:0,prev:0};
+const mx=(a,b,k)=>[a[0]+(b[0]-a[0])*k,a[1]+(b[1]-a[1])*k,a[2]+(b[2]-a[2])*k],ca=(c,a)=>`rgba(${c[0]|0},${c[1]|0},${c[2]|0},${Math.max(0,Math.min(1,a))})`;
+function hit(calm,main){H.sw=calm?.6:.9;H.waves.push({r:0,a:calm?.28:.45,c:main.slice()});if(H.waves.length>4)H.waves.shift()}
+function draw(t){requestAnimationFrame(draw);if(document.hidden||t-H.prev<31)return;const dt=Math.min(.1,(t-H.prev)/1000);H.prev=t;
+ const cv=$('heart'),b=cv.getBoundingClientRect(),W=Math.min(960,Math.round(b.width)),H2=Math.round(W*b.height/(b.width||1));if(!W||!H2)return;if(cv.width!==W||cv.height!==H2){cv.width=W;cv.height=H2}
+ const g=cv.getContext('2d'),calm=L.comfort!==false,m=L.mode,now=Date.now()/1000+skew,beaty=L.running!==false&&(m==='party'||L.music_in_game),kc=Math.min(1,dt*5);
+ let main=H.c.screen,top=-1;for(const k of ['screen','beat','wash']){const l=(L.lights||{})[k],lit=l&&l.bri>0&&l.rgb;H.c[k]=mx(H.c[k],lit?l.rgb:[70,62,100],kc);H.a[k]+=((lit?l.bri/255:0)-H.a[k])*kc;if(H.a[k]>top){top=H.a[k];main=H.c[k]}}
+ if(beaty){if(L.period&&L.beat_anchor){const bt=L.beat_anchor+Math.floor((now-L.beat_anchor)/L.period)*L.period;if(bt>H.next&&now-bt<.15){H.next=bt;hit(calm,main)}}
+  else if(L.beat_at>H.seen){H.seen=L.beat_at;if(now-L.beat_at<.4)hit(calm,main)}}
+ const sp=L.spectrum||[],kl=Math.min(1,dt*12);H.en+=((beaty?L.energy||0:0)-H.en)*kl;for(let i=0;i<32;i++)H.spec[i]+=((beaty?sp[i]||0:0)-H.spec[i])*kl;
+ const ts=L.tvd_segments&&L.tvd_segments.length?L.tvd_segments:null,n=ts?ts.length:10;if(H.segs.length!==n)H.segs=Array.from({length:n},()=>H.c.screen.slice());for(let i=0;i<n;i++)H.segs[i]=mx(H.segs[i],ts?ts[i]:H.c.screen,kc);
+ H.sw*=Math.pow(.015,dt);H.rot+=dt*(.05+.45*H.en);
+ const M=Math.min(W,H2),cx=W/2,cy=H2/2,on=beaty||top>0,R=M*.24*(1+(calm?.055:.11)*H.sw+.015*Math.sin(t/900));
+ g.clearRect(0,0,W,H2);g.globalCompositeOperation='lighter';g.lineCap='round';
+ const gr=g.createRadialGradient(cx,cy,R*.7,cx,cy,M*.5);gr.addColorStop(0,ca(main,(.08+.2*H.en+(calm?.08:.18)*H.sw+.12*top)*(on?1:.4)));gr.addColorStop(1,ca(main,0));g.fillStyle=gr;g.fillRect(0,0,W,H2);
+ for(let i=H.waves.length-1;i>=0;i--){const w=H.waves[i];w.r+=dt*M*.32;w.a*=Math.pow(.2,dt);const r=R*1.12+w.r;if(w.a<.02||r>M*.49){H.waves.splice(i,1);continue}g.strokeStyle=ca(w.c,w.a*Math.min(1,(M*.49-r)/(M*.08)));g.lineWidth=2;g.beginPath();g.arc(cx,cy,r,0,Math.PI*2);g.stroke()}
+ for(let i=0;i<48;i++){const k=i<24?i:47-i,v=Math.min(1,H.spec[Math.floor(k/24*32)]),a=H.rot+i/48*Math.PI*2,r0=R*1.24,len=M*(.006+.15*v*(.55+.6*H.en));g.strokeStyle=ca(mx(H.segs[Math.floor(i/48*n)],main,.25),(.22+.78*v)*(on?1:.4));g.lineWidth=2.2;g.beginPath();g.moveTo(cx+Math.cos(a)*r0,cy+Math.sin(a)*r0);g.lineTo(cx+Math.cos(a)*(r0+len),cy+Math.sin(a)*(r0+len));g.stroke()}
+ for(let i=0;i<n;i++){const a0=-Math.PI/2+i/n*Math.PI*2+.05,a1=-Math.PI/2+(i+1)/n*Math.PI*2-.05;g.strokeStyle=ca(H.segs[i],(.35+.65*H.a.screen)*(on?1:.4));g.lineWidth=M*.016;g.beginPath();g.arc(cx,cy,R*1.11,a0,a1);g.stroke()}
+ g.globalCompositeOperation='source-over';g.fillStyle='rgba(8,6,18,.92)';g.beginPath();g.arc(cx,cy,R,0,Math.PI*2);g.fill();g.strokeStyle=ca(main,.35+.3*H.sw);g.lineWidth=2;g.stroke()}
+clock();setInterval(clock,5000);slow();live();requestAnimationFrame(draw);
+</script></body></html>
