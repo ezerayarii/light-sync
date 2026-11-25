@@ -123,3 +123,7 @@ examples.
 
 Built with AI pair-programming (Claude Code). MoveNet pose model by Google (Apache 2.0), see
 `pi_addon/light_sync_pose/NOTICE.md`.
+
+## License
+
+MIT, see [LICENSE](LICENSE). The MoveNet model keeps its own Apache 2.0 license (see `pi_addon/light_sync_pose/NOTICE.md`).
